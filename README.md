@@ -1,5 +1,9 @@
 # TeslaBMS
 
-Based off work done by Collin Kidder
+Based off work done by Collin Kidder and Tom de Bree.
 
-Designed to work with my own board design and a Teensy 3.2
+# Homestorage
+
+Implementing a bridge between two Tesla Model S battery modules (24V each) and a victron energy setup using a CCGX and a MultiGrid 48/3000/35 inverter.
+
+Simplified Setup using a Teensy 3.5 using the built-in CAN-interface and a 5V/3.3V level shifter. No Shunt used yet.
