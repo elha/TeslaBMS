@@ -5,7 +5,7 @@
 #include "Logger.h"
 #include <ADC.h>
 
-#include <mcp_can.h>
+#include <FlexCAN.h>
 #include <SPI.h>
 
 BMSModuleManager bms;
@@ -68,18 +68,15 @@ uint16_t disvoltage = 42000; // max discharge voltage in mv
 uint16_t discurrent = 30000; // max discharge current in ma
 uint16_t SOH = 100; // SOH place holder
 
-unsigned char mes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-unsigned char bmsname[8] = {'S', 'I', 'M', 'P', ' ', 'B', 'M', 'S'};
-unsigned char bmsmanu[8] = {'T', 'O', 'M', ' ', 'D', 'E', ' ', 'B'};
+
+static CAN_message_t msg;
+static CAN_message_t msgin;
 long unsigned int rxId;
 unsigned char len = 0;
-byte rxBuf[8];
+
 char msgString[128];                        // Array to store serial string
 uint32_t inbox;
 signed long CANmilliamps;
-
-MCP_CAN CAN(10); //set CS pin for can controlelr
-
 
 //variables for current calulation
 int value;
@@ -129,7 +126,7 @@ void loadSettings()
   settings.UnderTSetpoint = -10.0f;
   settings.balanceVoltage = 3.9f;
   settings.balanceHyst = 0.04f;
-  settings.logLevel = 2;
+  settings.logLevel = 3;
 }
 
 
@@ -143,6 +140,7 @@ void setup()
   pinMode(ACUR2, INPUT);
   pinMode(IN1, INPUT);
   pinMode(IN2, INPUT);
+  pinMode(BMBfault, INPUT);
   pinMode(OUT1, OUTPUT); // drive contactor
   pinMode(OUT2, OUTPUT); // precharge
   pinMode(OUT3, OUTPUT); // charge relay
@@ -152,11 +150,9 @@ void setup()
   pinMode(FUEL, OUTPUT);
   pinMode(led, OUTPUT);
 
-  if (CAN.begin(MCP_ANY, CAN_500KBPS, MCP_16MHZ) == CAN_OK) Serial.println("MCP2515 Initialized Successfully!");
-  else Serial.println("Error Initializing MCP2515...");
-
-  CAN.setMode(MCP_NORMAL);
-
+  Can0.begin(500000);
+  Serial.println("CAN Initialized Successfully!");
+  
   adc->setAveraging(16); // set number of averages
   adc->setResolution(16); // set bits of resolution
   adc->setConversionSpeed(ADC_CONVERSION_SPEED::MED_SPEED);
@@ -180,7 +176,7 @@ void setup()
 
   bms.renumberBoardIDs();
 
-  Logger::setLoglevel(Logger::Off); //Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4
+  Logger::setLoglevel((Logger::LogLevel)settings.logLevel); //Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4
 
   lastUpdate = 0;
 
@@ -192,7 +188,7 @@ void setup()
 void loop()
 {
   //console.loop();
-  if (CAN.checkReceive() == 3)                        // If rx flag is set
+  if (Can0.available())                        // If rx flag is set
   {
     canread();
   }
@@ -666,53 +662,98 @@ void calcur()
   SERIALCONSOLE.println("  ");
 }
 
+
 void VEcan() //communication with Victron system over CAN
 {
-  mes[0] = lowByte(chargevoltage / 100);
-  mes[1] = highByte(chargevoltage / 100);
-  mes[2] = lowByte(chargecurrent / 100);
-  mes[3] = highByte(chargecurrent / 100);
-  mes[4] = lowByte(discurrent / 100);
-  mes[5] = highByte(discurrent / 100);
-  mes[6] = lowByte(disvoltage / 100);
-  mes[7] = highByte(disvoltage / 100);
+  msg.ext = 0;
+  msg.id = 0x351;
+  msg.len = 8;
+  msg.buf[0] = lowByte(chargevoltage / 100);
+  msg.buf[1] = highByte(chargevoltage / 100);
+  msg.buf[2] = lowByte(chargecurrent / 100);
+  msg.buf[3] = highByte(chargecurrent / 100);
+  msg.buf[4] = lowByte(discurrent / 100);
+  msg.buf[5] = highByte(discurrent / 100);
+  msg.buf[6] = lowByte(disvoltage / 100);
+  msg.buf[7] = highByte(disvoltage / 100);
 
-  CAN.sendMsgBuf(0x351, 0, 8, mes);
+  Can0.write(msg);
+  
+  msg.ext = 0;
+  msg.id = 0x355;
+  msg.len = 8;
+  msg.buf[0] = lowByte(SOC);
+  msg.buf[1] = highByte(SOC);
+  msg.buf[2] = lowByte(SOH);
+  msg.buf[3] = highByte(SOH);
+  msg.buf[4] = lowByte(SOC * 10);
+  msg.buf[5] = highByte(SOC * 10);
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
 
-  mes[0] = lowByte(SOC);
-  mes[1] = highByte(SOC);
-  mes[2] = lowByte(SOH);
-  mes[3] = highByte(SOH);
-  mes[4] = lowByte(SOC * 10);
-  mes[5] = highByte(SOC * 10);
-  mes[6] = 0;
-  mes[7] = 0;
+  Can0.write(msg);
 
-  CAN.sendMsgBuf(0x355, 0, 8, mes);
+  msg.ext = 0;
+  msg.id = 0x356;
+  msg.len = 8;
+  msg.buf[0] = lowByte(uint16_t(bms.getPackVoltage() * 100));
+  msg.buf[1] = highByte(uint16_t(bms.getPackVoltage() * 100));
+  msg.buf[2] = lowByte(long(currentact / 100));
+  msg.buf[3] = highByte(long(currentact / 100));
+  msg.buf[4] = lowByte(uint16_t(bms.getAvgTemperature() * 10));
+  msg.buf[5] = highByte(uint16_t(bms.getAvgTemperature() * 10));
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
 
-  mes[0] = lowByte(uint16_t(bms.getPackVoltage() * 100));
-  mes[1] = highByte(uint16_t(bms.getPackVoltage() * 100));
-  mes[2] = lowByte(long(currentact / 100));
-  mes[3] = highByte(long(currentact / 100));
-  mes[4] = lowByte(uint16_t(bms.getAvgTemperature() * 10));
-  mes[5] = highByte(uint16_t(bms.getAvgTemperature() * 10));
+  Can0.write(msg);
 
-  CAN.sendMsgBuf(0x356, 0, 8, mes);
+  msg.ext = 0;
+  msg.id = 0x35A;
+  msg.len = 8;
+  msg.buf[0] = 0;
+  msg.buf[1] = 0;
+  msg.buf[2] = 0;
+  msg.buf[3] = 0;
+  msg.buf[4] = 0;
+  msg.buf[5] = 0;
+  msg.buf[6] = 0;
+  msg.buf[7] = 0;
 
-  mes[0] = 0;
-  mes[1] = 0;
-  mes[2] = 0;
-  mes[3] = 0;
-  mes[4] = 0;
-  mes[5] = 0;
-  mes[6] = 0;
-  mes[7] = 0;
+  Can0.write(msg);
 
-  CAN.sendMsgBuf(0x35A, 0, 8, mes);
   delay(5);
-  CAN.sendMsgBuf(0x35E, 0, 8, bmsname);
+
+  // bmsname
+  msg.ext = 0;
+  msg.id = 0x35E;
+  msg.len = 8;
+  msg.buf[0] = 'S';
+  msg.buf[1] = 'I';
+  msg.buf[2] = 'M';
+  msg.buf[3] = 'P';
+  msg.buf[4] = ' ';
+  msg.buf[5] = 'B';
+  msg.buf[6] = 'M';
+  msg.buf[7] = 'S';
+
+  Can0.write(msg);
+  
   delay(5);
-  CAN.sendMsgBuf(0x370, 0, 8, bmsmanu);
+  
+  // bmsmanufacturer
+  msg.ext = 0;
+  msg.id = 0x370;
+  msg.len = 8;
+  msg.buf[0] = 'T';
+  msg.buf[1] = 'O';
+  msg.buf[2] = 'M';
+  msg.buf[3] = ' ';
+  msg.buf[4] = 'D';
+  msg.buf[5] = 'E';
+  msg.buf[6] = ' ';
+  msg.buf[7] = 'B';
+
+  Can0.write(msg);
 
 }
 
@@ -1031,12 +1072,12 @@ void menu()
 
 void canread()
 {
-  CAN.readMsgBuf(&rxId, &len, rxBuf);      // Read data: len = data length, buf = data byte(s)
+  Can0.read(msgin);      // Read data: len = data length, buf = data byte(s)
 
-  switch (rxId)
+  switch (msgin.id)
   {
     case 0x3c2:
-      CAB300(rxBuf);
+      CAB300(msgin.buf);
       break;
 
     default:
@@ -1057,7 +1098,7 @@ void canread()
       Serial.print(msgString);
     } else {
       for (byte i = 0; i < len; i++) {
-        sprintf(msgString, ", 0x%.2X", rxBuf[i]);
+        sprintf(msgString, ", 0x%.2X", msgin.buf[i]);
         Serial.print(msgString);
       }
     }
