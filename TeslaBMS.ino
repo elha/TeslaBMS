@@ -10,8 +10,6 @@ SerialConsole console;
 EEPROMSettings settings;
 
 // status
-int debug = 1;
-
 byte bmsstatus = Boot;
 uint16_t SOC = 100; 
 uint16_t SOH = 100; 
@@ -151,7 +149,7 @@ void loop_bms()
 
 void loop_debug()
 {
-  if (debug == 0) return;
+  if (settings.logLevel != 0) return;
   SERIALCONSOLE.println();
   SERIALCONSOLE.println();
   SERIALCONSOLE.println();
@@ -425,9 +423,7 @@ void loop_menu()
     switch (incomingByte)
     {
       case 113: //q to go back to main menu
-
         menuload = 0;
-        debug = 1;
         break;
 
       case 99: //c for calibrate zero offset
@@ -472,7 +468,6 @@ void loop_menu()
     SERIALCONSOLE.println("c - Current Sensor Calibration");
     SERIALCONSOLE.println("b - Battery Settings");
     SERIALCONSOLE.println("q - exit menu");
-    debug = 0;
     menuload = 1;
   }
 }
