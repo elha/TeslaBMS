@@ -2,23 +2,6 @@
 
 #include <Arduino.h>
 
-// Simple BMS wiring
-
-// inputs
-#define INACUR1 A0 
-#define INACUR2 A1
-#define INKEY 16
-#define INACPRESENT 17
-
-// outputs - high active
-#define OUTCONTACTOR 20
-#define OUTPRECHARGE 21
-#define OUTCHARGERELEAY 23
-#define OUTCONTACTOR 24
-#define OUTPWMDRIVER 3
-#define OUTPWMDRIVER2 4
-#define INBMBFAULT 11
-
 // bms status values
 #define Boot 0
 #define Ready 1
@@ -31,13 +14,13 @@
 #define Undefined 0
 #define Analogue 1
 #define Canbus 2
-#define cursens Canbus
 
-// Set to the proper port for your USB connection - SerialUSB on Due (Native) or Serial for Due (Programming) or Teensy
+// USB
 #define SERIALCONSOLE Serial
 
-// Define this to be the serial port the Tesla BMS modules are connected to.
-#define SERIALBMS Serial3
+// Tesla BMS Modules
+#define SERIALBMS Serial3 
+#define INBMBFAULT 11
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1
@@ -77,4 +60,10 @@ typedef struct {
     float UnderTSetpoint;
     float balanceVoltage;
     float balanceHyst;
+    float ChargeV;
+    float DischargeV;
+    float ChargeI;
+    float DischargeI;
+    float SOC10V;
+    float SOC90V;
 } EEPROMSettings;
