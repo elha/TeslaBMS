@@ -15,10 +15,10 @@ uint16_t SOC = 0;
 uint16_t SOH = 100; 
 float currentact;
 int menuload = 0;
+unsigned char alarm[4] = {0, 0, 0, 0};
 
 void setup()
 {
-  pinMode(INBMBFAULT, INPUT);
   setup_settings();
 
   delay(4000);  // wait for USB
@@ -30,9 +30,10 @@ void setup()
 
 void loop()
 {
- loop_readcan();
- loop_menu();
- loop_bms();
+   loop_readcan();
+   loop_menu();
+   loop_bms();
+   loop_alarm();
  
   static unsigned long looptime;
   if (millis() - looptime > 500)
@@ -44,6 +45,29 @@ void loop()
     loop_vecan();
 
     loop_debug();
+  }
+}
+
+void loop_alarm()
+{
+  alarm[0] = 0;
+  if (bms.getHighCellVolt() > settings.OverVSetpoint);
+  {
+    alarm[0] = 0x04;
+  }
+  if (bms.getLowCellVolt() < settings.UnderVSetpoint)
+  {
+    alarm[0] |= 0x10;
+  }
+  if (bms.getAvgTemperature() > settings.OverTSetpoint)
+  {
+    alarm[0] |= 0x40;
+  }
+  
+  alarm[1] = 0;
+  if (bms.getAvgTemperature() < settings.UnderTSetpoint)
+  {
+    alarm[1] = 0x01;
   }
 }
 
@@ -83,7 +107,6 @@ void setup_bms()
   bms.renumberBoardIDs();
   bms.clearFaults();
   bms.findBoards();
-
 }
 
 // loop ###############
@@ -239,11 +262,10 @@ void loop_vecan() //communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x35A;
   msg.len = 8;
-  msg.buf[0] = 0;
-  msg.buf[1] = 0;
-  msg.buf[2] = 0;
-  msg.buf[3] = 0;
-  msg.buf[4] = 0;
+  msg.buf[0] = alarm[0]; // High temp  Low Voltage | High Voltage
+  msg.buf[1] = alarm[1]; // High Discharge Current | Low Temperature
+  msg.buf[2] = alarm[2]; // Internal Failure | High Charge current
+  msg.buf[3] = alarm[3]; // Cell Imbalance  
   msg.buf[5] = 0;
   msg.buf[6] = 0;
   msg.buf[7] = 0;

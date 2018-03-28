@@ -168,6 +168,8 @@ void BMSModuleManager::findBoards()
 */
 void BMSModuleManager::renumberBoardIDs()
 {
+    pinMode(INBMBFAULT, INPUT);
+
     uint8_t payload[3];
     uint8_t buff[8];
     int attempts = 1;
