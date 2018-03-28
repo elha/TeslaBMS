@@ -2,16 +2,42 @@
 
 #include <Arduino.h>
 
-//Set to the proper port for your USB connection - SerialUSB on Due (Native) or Serial for Due (Programming) or Teensy
-#define SERIALCONSOLE   Serial
+// Simple BMS wiring
 
-//Define this to be the serial port the Tesla BMS modules are connected to.
-//On the Due you need to use a USART port (Serial1, Serial2, Serial3) and update the call to serialSpecialInit if not Serial1
-//Serial3 for teensy
-#define SERIALBMS  Serial3
+// inputs
+#define INACUR1 A0 
+#define INACUR2 A1
+#define INKEY 16
+#define INACPRESENT 17
 
-// victron serial VE direct bus config
-#define VE Serial2
+// outputs - high active
+#define OUTCONTACTOR 20
+#define OUTPRECHARGE 21
+#define OUTCHARGERELEAY 23
+#define OUTCONTACTOR 24
+#define OUTPWMDRIVER 3
+#define OUTPWMDRIVER2 4
+#define INBMBFAULT 11
+
+// bms status values
+#define Boot 0
+#define Ready 1
+#define Drive 2
+#define Charge 3
+#define Precharge 4
+#define Err 5
+
+// current sensor values
+#define Undefined 0
+#define Analogue 1
+#define Canbus 2
+#define cursens Canbus
+
+// Set to the proper port for your USB connection - SerialUSB on Due (Native) or Serial for Due (Programming) or Teensy
+#define SERIALCONSOLE Serial
+
+// Define this to be the serial port the Tesla BMS modules are connected to.
+#define SERIALBMS Serial3
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1

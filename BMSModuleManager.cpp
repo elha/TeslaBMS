@@ -288,7 +288,7 @@ void BMSModuleManager::getAllVoltTemp()
     if (packVolt > highestPackVolt) highestPackVolt = packVolt;
     if (packVolt < lowestPackVolt) lowestPackVolt = packVolt;
     
-    if (digitalRead(11) == LOW) {
+    if (digitalRead(INBMBFAULT) == LOW) {
         if (!isFaulted) Logger::error("One or more BMS modules have entered the fault state!");
         isFaulted = true;
     }

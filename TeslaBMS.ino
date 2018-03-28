@@ -4,46 +4,13 @@
 #include "SerialConsole.h"
 #include "Logger.h"
 #include <ADC.h>
-
 #include <FlexCAN.h>
-#include <SPI.h>
 
 BMSModuleManager bms;
 SerialConsole console;
 EEPROMSettings settings;
 
-
-//Simple BMS wiring//
-const int ACUR1 = A0; // current 1
-const int ACUR2 = A1; // current 2
-const int IN1 = 16; // input 1 - high active
-const int IN2 = 17; // input 2- high active
-const int OUT1 = 20;// output 1 - high active
-const int OUT2 = 21;// output 1 - high active
-const int OUT3 = 23;// output 1 - high active
-const int OUT4 = 24;// output 1 - high active
-const int OUT5 = 3;// output 1 - high active
-const int OUT6 = 4;// output 1 - high active
-const int FUEL = 5;// Fuel gauge pwm signal
-const int led = 13;
-const int BMBfault = 11;
-
-byte bmsstatus = 0;
-//bms status values
-#define Boot 0
-#define Ready 1
-#define Drive 2
-#define Charge 3
-#define Precharge 4
-#define Error 5
-//
-int cursens = 2;
-//Current sensor values
-#define Undefined 0
-#define Analogue 1
-#define Canbus 2
-//
-
+byte bmsstatus = Boot;
 
 int Discharge;
 
@@ -55,24 +22,16 @@ int Pretime = 5000; //precharge timer
 int conthold = 50; //holding duty cycle for contactor 0-255
 int Precurrent = 1000; //ma before closing main contator
 
-int gaugelow = 255; //empty fuel gauge pwm
-int gaugehigh = 70; //full fuel gauge pwm
-
-//variables for VE driect bus comms
-char* myStrings[] = {"V", "14674", "I", "0", "CE", "-1", "SOC", "800", "TTG", "-1", "Alarm", "OFF", "Relay", "OFF", "AR", "0", "BMV", "600S", "FW", "212", "H1", "-3", "H2", "-3", "H3", "0", "H4", "0", "H5", "0", "H6", "-7", "H7", "13180", "H8", "14774", "H9", "137", "H10", "0", "H11", "0", "H12", "0"};
-
 //variables for VE can
-uint16_t chargevoltage = 49100; //max charge voltage in mv
-uint16_t chargecurrent = 30000; //max charge current in ma
-uint16_t disvoltage = 42000; // max discharge voltage in mv
-uint16_t discurrent = 30000; // max discharge current in ma
+uint16_t chargevoltage = 48000; //max charge voltage in mv 48V
+uint16_t chargecurrent = 2000; //max charge current in ma 20A
+uint16_t disvoltage = 40000; // max discharge voltage in mv 40V
+uint16_t discurrent = 2000; // max discharge current in ma 20A
 uint16_t SOH = 100; // SOH place holder
-
 
 static CAN_message_t msg;
 static CAN_message_t msgin;
 long unsigned int rxId;
-unsigned char len = 0;
 
 char msgString[128];                        // Array to store serial string
 uint32_t inbox;
@@ -129,65 +88,47 @@ void loadSettings()
   settings.logLevel = 3;
 }
 
-
-uint32_t lastUpdate;
-
-
 void setup()
 {
-  delay(4000);  //just for easy debugging. It takes a few seconds for USB to come up properly on most OS's
-  pinMode(ACUR1, INPUT);
-  pinMode(ACUR2, INPUT);
-  pinMode(IN1, INPUT);
-  pinMode(IN2, INPUT);
-  pinMode(BMBfault, INPUT);
-  pinMode(OUT1, OUTPUT); // drive contactor
-  pinMode(OUT2, OUTPUT); // precharge
-  pinMode(OUT3, OUTPUT); // charge relay
-  pinMode(OUT4, OUTPUT); // Negative contactor
-  pinMode(OUT5, OUTPUT); // pwm driver output
-  pinMode(OUT6, OUTPUT); // pwm driver output
-  pinMode(FUEL, OUTPUT);
-  pinMode(led, OUTPUT);
+  pinMode(INACUR1, INPUT);
+  pinMode(INACUR2, INPUT);
+  pinMode(INKEY, INPUT);
+  pinMode(INACPRESENT, INPUT);
+  pinMode(INBMBFAULT, INPUT);
+  pinMode(OUTCONTACTOR, OUTPUT); // drive contactor
+  pinMode(OUTPRECHARGE, OUTPUT); // precharge
+  pinMode(OUTCHARGERELEAY, OUTPUT); // charge relay
+  pinMode(OUTCONTACTOR, OUTPUT); // Negative contactor
+  pinMode(OUTPWMDRIVER, OUTPUT); // pwm driver output
+  pinMode(OUTPWMDRIVER2, OUTPUT); // pwm driver output
 
+  loadSettings();
+
+  delay(4000);  //just for easy debugging. It takes a few seconds for USB to come up properly on most OS's
+
+  SERIALCONSOLE.begin(115200); 
+  SERIALBMS.begin(612500); //Tesla serial bus
   Can0.begin(500000);
-  Serial.println("CAN Initialized Successfully!");
-  
+
+  Logger::setLoglevel((Logger::LogLevel)settings.logLevel); //Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4
+  Logger::console("Initializing ...");
+    
   adc->setAveraging(16); // set number of averages
   adc->setResolution(16); // set bits of resolution
   adc->setConversionSpeed(ADC_CONVERSION_SPEED::MED_SPEED);
   adc->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);
-  adc->startContinuous(ACUR1, ADC_0);
+  adc->startContinuous(INACUR1, ADC_0);
 
-
-  SERIALCONSOLE.begin(115200);
-  SERIALCONSOLE.println("Starting up!");
-  SERIALBMS.begin(612500); //Tesla serial bus
-  //VE.begin(19200); //Victron VE direct bus
-#if defined (__arm__) && defined (__SAM3X8E__)
-  serialSpecialInit(USART0, 612500); //required for Due based boards as the stock core files don't support 612500 baud.
-#endif
-
-  SERIALCONSOLE.println("Started serial interface to BMS.");
-
-
-
-  loadSettings();
-
+  
   bms.renumberBoardIDs();
 
-  Logger::setLoglevel((Logger::LogLevel)settings.logLevel); //Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4
-
-  lastUpdate = 0;
-
-  //bms.clearFaults();
+  bms.clearFaults();
+  
   bms.findBoards();
-  digitalWrite(led, HIGH);
 }
 
 void loop()
 {
-  //console.loop();
   if (Can0.available())                        // If rx flag is set
   {
     canread();
@@ -214,11 +155,11 @@ void loop()
       {
         bms.balanceCells();
       }
-      if (digitalRead(IN2) == HIGH && (settings.balanceVoltage + settings.balanceHyst) > bms.getHighCellVolt()) //detect AC present for charging and check not balancing
+      if (digitalRead(INACPRESENT) == HIGH && (settings.balanceVoltage + settings.balanceHyst) > bms.getHighCellVolt()) //detect AC present for charging and check not balancing
       {
         bmsstatus = Charge;
       }
-      if (digitalRead(IN1) == HIGH) //detect Key ON
+      if (digitalRead(INKEY) == HIGH) //detect Key ON
       {
         bmsstatus = Precharge;
         Pretimer = millis();
@@ -234,10 +175,10 @@ void loop()
 
     case (Drive):
       Discharge = 1;
-      if (digitalRead(IN1) == LOW)//Key OFF
+      if (digitalRead(INKEY) == LOW)//Key OFF
       {
-        digitalWrite(OUT4, LOW);
-        digitalWrite(OUT1, LOW);
+        digitalWrite(OUTCONTACTOR, LOW);
+        digitalWrite(OUTCONTACTOR, LOW);
 
         contctrl = 0; //turn off out 5 and 6
         bmsstatus = Ready;
@@ -247,27 +188,27 @@ void loop()
 
     case (Charge):
       Discharge = 0;
-      digitalWrite(OUT3, HIGH);//enable charger
+      digitalWrite(OUTCHARGERELEAY, HIGH);//enable charger
       if (bms.getHighCellVolt() > settings.balanceVoltage);
       {
         bms.balanceCells();
       }
       if (bms.getHighCellVolt() > settings.OverVSetpoint);
       {
-        digitalWrite(OUT3, LOW);//turn off charger
+        digitalWrite(OUTCHARGERELEAY, LOW);//turn off charger
         bmsstatus = Ready;
       }
-      if (digitalRead(IN2) == LOW)//detect AC not present for charging
+      if (digitalRead(INACPRESENT) == LOW)//detect AC not present for charging
       {
-        digitalWrite(OUT3, LOW);//turn off charger
+        digitalWrite(OUTCHARGERELEAY, LOW);//turn off charger
         bmsstatus = Ready;
       }
       break;
 
-    case (Error):
+    case (Err):
       Discharge = 0;
 
-      if (digitalRead(IN2) == HIGH) //detect AC present for charging
+      if (digitalRead(INACPRESENT) == HIGH) //detect AC present for charging
       {
         bmsstatus = Charge;
       }
@@ -288,13 +229,10 @@ void loop()
     looptime = millis();
     bms.getAllVoltTemp();
 
-    //UV  check
-
     if (bms.getLowCellVolt() < settings.UnderVSetpoint)
     {
-      bmsstatus = Error;
+      bmsstatus = Err;
     }
-
 
     if (debug != 0)
     {
@@ -302,21 +240,7 @@ void loop()
       bms.printPackDetails();
     }
     updateSOC();
-    //BMVmessage();
-    //gaugeupdate();
     VEcan();
-  }
-}
-
-void gaugeupdate()
-{
-  analogWrite(FUEL, map(SOC, 0, 100, gaugelow, gaugehigh));
-  if (debug != 0)
-  {
-    SERIALCONSOLE.println("  ");
-    SERIALCONSOLE.print("fuel pwm : ");
-    SERIALCONSOLE.print(map(SOC, 0, 100, gaugelow, gaugehigh));
-    SERIALCONSOLE.println("  ");
   }
 }
 
@@ -349,16 +273,16 @@ void printbmsstat()
       SERIALCONSOLE.print(" Charge ");
       break;
 
-    case (Error):
+    case (Err):
       SERIALCONSOLE.print(" Error ");
       break;
   }
   SERIALCONSOLE.print("  ");
-  if (digitalRead(IN2) == HIGH)
+  if (digitalRead(INKEY) == HIGH)
   {
     SERIALCONSOLE.print("| AC Present |");
   }
-  if (digitalRead(IN1) == HIGH)
+  if (digitalRead(INKEY) == HIGH)
   {
     SERIALCONSOLE.print("| Key ON |");
   }
@@ -372,12 +296,12 @@ void getcurrent()
     if (currentact < 19000 && currentact > -19000)
     {
       sensor = 1;
-      adc->startContinuous(ACUR1, ADC_0);
+      adc->startContinuous(INACUR1, ADC_0);
     }
     else
     {
       sensor = 2;
-      adc->startContinuous(ACUR2, ADC_0);
+      adc->startContinuous(INACUR2, ADC_0);
     }
 
     if (sensor == 1)
@@ -550,20 +474,20 @@ void updateSOC()
 
 void Prechargecon()
 {
-  if (digitalRead(IN1) == HIGH) //detect Key ON
+  if (digitalRead(INKEY) == HIGH) //detect Key ON
   {
-    digitalWrite(OUT4, HIGH);//Negative Contactor Close
+    digitalWrite(OUTCONTACTOR, HIGH);//Negative Contactor Close
     contctrl = 2;
     if (Pretimer + Pretime > millis() || currentact > Precurrent)
     {
-      digitalWrite(OUT2, HIGH);//precharge
+      digitalWrite(OUTPRECHARGE, HIGH);//precharge
     }
     else //close main contactor
     {
-      digitalWrite(OUT1, HIGH);//Positive Contactor Close
+      digitalWrite(OUTCONTACTOR, HIGH);//Positive Contactor Close
       contctrl = 3;
       bmsstatus = Drive;
-      digitalWrite(OUT2, LOW);
+      digitalWrite(OUTPRECHARGE, LOW);
     }
   }
   else
@@ -579,12 +503,12 @@ void contcon()
   {
     if ((contctrl & 1) == 0)
     {
-      analogWrite(OUT5, 0);
+      analogWrite(OUTPWMDRIVER, 0);
       contstat = contstat & 254;
     }
     if ((contctrl & 2) == 0)
     {
-      analogWrite(OUT6, 0);
+      analogWrite(OUTPWMDRIVER2, 0);
       contstat = contstat & 253;
     }
 
@@ -592,12 +516,12 @@ void contcon()
     {
       if (conttimer == 0)
       {
-        analogWrite(OUT5, 255);
+        analogWrite(OUTPWMDRIVER, 255);
         conttimer = millis() + pulltime ;
       }
       if (conttimer < millis())
       {
-        analogWrite(OUT5, conthold);
+        analogWrite(OUTPWMDRIVER, conthold);
         contstat = contstat | 1;
         conttimer = 0;
       }
@@ -607,12 +531,12 @@ void contcon()
     {
       if (conttimer == 0)
       {
-        analogWrite(OUT6, 255);
+        analogWrite(OUTPWMDRIVER2, 255);
         conttimer = millis() + pulltime ;
       }
       if (conttimer < millis())
       {
-        analogWrite(OUT6, conthold);
+        analogWrite(OUTPWMDRIVER2, conthold);
         contstat = contstat | 2;
         conttimer = 0;
       }
@@ -631,7 +555,7 @@ void contcon()
 
 void calcur()
 {
-  adc->startContinuous(ACUR1, ADC_0);
+  adc->startContinuous(INACUR1, ADC_0);
   sensor = 1;
   SERIALCONSOLE.print(" Calibrating Current Offset ::::: ");
   while (x < 20)
@@ -646,7 +570,7 @@ void calcur()
   SERIALCONSOLE.print(" current offset 1 calibrated ");
   SERIALCONSOLE.println("  ");
   x = 0;
-  adc->startContinuous(ACUR2, ADC_0);
+  adc->startContinuous(INACUR2, ADC_0);
   sensor = 2;
   SERIALCONSOLE.print(" Calibrating Current Offset ::::: ");
   while (x < 20)
@@ -757,89 +681,6 @@ void VEcan() //communication with Victron system over CAN
 
 }
 
-void BMVmessage()//communication with the Victron Color Control System over VEdirect
-{
-  lasttime = millis();
-  x = 0;
-  VE.write(13);
-  VE.write(10);
-  VE.write(myStrings[0]);
-  VE.write(9);
-  VE.print(bms.getPackVoltage() * 1000, 0);
-  VE.write(13);
-  VE.write(10);
-  VE.write(myStrings[2]);
-  VE.write(9);
-  VE.print(currentact);
-  VE.write(13);
-  VE.write(10);
-  VE.write(myStrings[4]);
-  VE.write(9);
-  VE.print(ampsecond * 0.27777777777778, 0); //consumed ah
-  VE.write(13);
-  VE.write(10);
-  VE.write(myStrings[6]);
-  VE.write(9);
-  VE.print(SOC * 10); //SOC
-  x = 8;
-  while (x < 20)
-  {
-    VE.write(13);
-    VE.write(10);
-    VE.write(myStrings[x]);
-    x ++;
-    VE.write(9);
-    VE.write(myStrings[x]);
-    x ++;
-  }
-  VE.write(13);
-  VE.write(10);
-  VE.write("Checksum");
-  VE.write(9);
-  VE.write(0x50); //0x59
-  delay(10);
-
-  while (x < 44)
-  {
-    VE.write(13);
-    VE.write(10);
-    VE.write(myStrings[x]);
-    x ++;
-    VE.write(9);
-    VE.write(myStrings[x]);
-    x ++;
-  }
-  /*
-    VE.write(13);
-    VE.write(10);
-    VE.write(myStrings[32]);
-    VE.write(9);
-    VE.print(bms.getLowVoltage()*1000,0);
-    VE.write(13);
-    VE.write(10);
-    VE.write(myStrings[34]);
-    VE.write(9);
-    VE.print(bms.getHighVoltage()*1000,0);
-    x=36;
-
-    while(x < 43)
-    {
-     VE.write(13);
-     VE.write(10);
-     VE.write(myStrings[x]);
-     x ++;
-     VE.write(9);
-     VE.write(myStrings[x]);
-     x ++;
-    }
-  */
-  VE.write(13);
-  VE.write(10);
-  VE.write("Checksum");
-  VE.write(9);
-  VE.write(231);
-}
-
 // Settings menu
 void menu()
 {
@@ -865,24 +706,6 @@ void menu()
         menuload = 0;
         incomingByte = 115;
         break;
-
-      case 115: //s for switch sensor
-        if (cursens == Analogue)
-        {
-          cursens = Canbus;
-          SERIALCONSOLE.println("  ");
-          SERIALCONSOLE.print(" CANbus Current Sensor ");
-          SERIALCONSOLE.println("  ");
-        }
-        else
-        {
-          cursens = Analogue;
-          SERIALCONSOLE.println("  ");
-          SERIALCONSOLE.print(" Analogue Current Sensor ");
-          SERIALCONSOLE.println("  ");
-        }
-        break;
-
 
       default:
         // if nothing else matches, do the default
@@ -1087,9 +910,9 @@ void canread()
   {
     Serial.print(millis());
     if ((rxId & 0x80000000) == 0x80000000)    // Determine if ID is standard (11 bits) or extended (29 bits)
-      sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d  Data:", (rxId & 0x1FFFFFFF), len);
+      sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d  Data:", (rxId & 0x1FFFFFFF), msgin.len);
     else
-      sprintf(msgString, ",0x%.3lX,false,%1d", rxId, len);
+      sprintf(msgString, ",0x%.3lX,false,%1d", rxId, msgin.len);
 
     Serial.print(msgString);
 
@@ -1097,7 +920,7 @@ void canread()
       sprintf(msgString, " REMOTE REQUEST FRAME");
       Serial.print(msgString);
     } else {
-      for (byte i = 0; i < len; i++) {
+      for (byte i = 0; i < msgin.len; i++) {
         sprintf(msgString, ", 0x%.2X", msgin.buf[i]);
         Serial.print(msgString);
       }
