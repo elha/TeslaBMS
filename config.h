@@ -50,16 +50,13 @@
 
 typedef struct {
     uint8_t version;
-    uint8_t checksum;
-    uint32_t canSpeed;
-    uint8_t batteryID;  //which battery ID should this board associate as on the CAN bus
     uint8_t logLevel;
     float OverVSetpoint;
     float UnderVSetpoint;
     float OverTSetpoint;
     float UnderTSetpoint;
-    float balanceVoltage;
-    float balanceHyst;
+    float BalanceV;
+    float BalanceVHyst;
     float ChargeV;
     float DischargeV;
     float ChargeI;

@@ -11,10 +11,9 @@ EEPROMSettings settings;
 
 // status
 byte bmsstatus = Boot;
-uint16_t SOC = 100; 
+uint16_t SOC = 0; 
 uint16_t SOH = 100; 
 float currentact;
-unsigned long looptime;
 int menuload = 0;
 
 void setup()
@@ -34,15 +33,17 @@ void loop()
  loop_readcan();
  loop_menu();
  loop_bms();
-  
+ 
+  static unsigned long looptime;
   if (millis() - looptime > 500)
   {
     looptime = millis();
 
     loop_querybms();
-    loop_debug();
     loop_calcsoc();
     loop_vecan();
+
+    loop_debug();
   }
 }
 
@@ -52,15 +53,12 @@ void setup_settings()
 {
   Logger::console("Loading defaults");
   settings.version = 0;
-  settings.checksum = 0;
-  settings.canSpeed = 500000;
-  settings.batteryID = 0x01; //in the future should be 0xFF to force it to ask for an address
   settings.OverVSetpoint = 4.1f;
   settings.UnderVSetpoint = 3.0f;
   settings.OverTSetpoint = 65.0f;
   settings.UnderTSetpoint = -10.0f;
-  settings.balanceVoltage = 3.9f;
-  settings.balanceHyst = 0.04f;
+  settings.BalanceV = 3.9f;
+  settings.BalanceVHyst = 0.04f;
   settings.logLevel = 3;
   settings.ChargeV = 48.0f;
   settings.DischargeV = 40.0f;
@@ -109,11 +107,11 @@ void loop_bms()
       break;
 
     case (Ready):
-      if (bms.getHighCellVolt() > settings.balanceVoltage);
+      if (bms.getHighCellVolt() > settings.BalanceV);
       {
         bms.balanceCells();
       }
-      if ((settings.balanceVoltage + settings.balanceHyst) > bms.getHighCellVolt()) //detect AC present for charging and check not balancing
+      if ((settings.BalanceV + settings.BalanceVHyst) > bms.getHighCellVolt()) //detect AC present for charging and check not balancing
       {
         bmsstatus = Charge;
       }
@@ -126,7 +124,7 @@ void loop_bms()
       break;
 
     case (Charge):
-      if (bms.getHighCellVolt() > settings.balanceVoltage);
+      if (bms.getHighCellVolt() > settings.BalanceV);
       {
         bms.balanceCells();
       }
@@ -343,10 +341,10 @@ void loop_menu()
         SERIALCONSOLE.print(settings.UnderTSetpoint);
         SERIALCONSOLE.print(" Under Temperature Setpoint - 4");
         SERIALCONSOLE.println("  ");
-        SERIALCONSOLE.print(settings.balanceVoltage * 1000, 0);
+        SERIALCONSOLE.print(settings.BalanceV * 1000, 0);
         SERIALCONSOLE.print("mV Balance Voltage Setpoint - 5 ");
         SERIALCONSOLE.println("  ");
-        SERIALCONSOLE.print(settings.balanceHyst * 1000, 0);
+        SERIALCONSOLE.print(settings.BalanceVHyst * 1000, 0);
         SERIALCONSOLE.print("mV Balance Voltage Hystersis - 6 ");
         SERIALCONSOLE.println("  ");
         break;
@@ -398,9 +396,9 @@ void loop_menu()
       case 53: //5 Balance Voltage Setpoint
         if (Serial.available() > 0)
         {
-          settings.balanceVoltage = Serial.parseInt();
-          settings.balanceVoltage = settings.balanceVoltage / 1000;
-          SERIALCONSOLE.print(settings.balanceVoltage * 1000, 0);
+          settings.BalanceV = Serial.parseInt();
+          settings.BalanceV = settings.BalanceV / 1000;
+          SERIALCONSOLE.print(settings.BalanceV * 1000, 0);
           SERIALCONSOLE.print("mV Balance Voltage Setpoint");
         }
         break;
@@ -408,9 +406,9 @@ void loop_menu()
       case 54: //6 Balance Voltage Hystersis
         if (Serial.available() > 0)
         {
-          settings.balanceHyst = Serial.parseInt();
-          settings.balanceHyst =  settings.balanceHyst / 1000;
-          SERIALCONSOLE.print(settings.balanceHyst * 1000, 0);
+          settings.BalanceVHyst = Serial.parseInt();
+          settings.BalanceVHyst =  settings.BalanceVHyst / 1000;
+          SERIALCONSOLE.print(settings.BalanceVHyst * 1000, 0);
           SERIALCONSOLE.print("mV Balance Voltage Hystersis");
         }
         break;
