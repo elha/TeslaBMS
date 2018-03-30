@@ -29,25 +29,25 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "config.h"
 
-class SerialConsole {
-public:
+class SerialConsole
+{
+  public:
     SerialConsole();
     void loop();
     void printMenu();
 
-protected:
+  protected:
     enum CONSOLE_STATE
     {
         STATE_ROOT_MENU
     };
 
-private:
+  private:
     char cmdBuffer[80];
     int ptrBuffer;
     int state;
     int loopcount;
     bool cancel;
-
 
     void init();
     void serialEvent();
@@ -56,5 +56,3 @@ private:
 };
 
 #endif /* SERIALCONSOLE_H_ */
-
-

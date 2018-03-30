@@ -7,8 +7,7 @@
 #define Ready 1
 #define Drive 2
 #define Charge 3
-#define Precharge 4
-#define Err 5
+#define Err 4
 
 // current sensor values
 #define Undefined 0
@@ -21,6 +20,10 @@
 // Tesla BMS Modules
 #define SERIALBMS Serial3 
 #define INBMBFAULT 11
+
+// Victron Bus
+#define CANVE Can0 
+
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1
@@ -57,10 +60,22 @@ typedef struct {
     float UnderTSetpoint;
     float BalanceV;
     float BalanceVHyst;
-    float ChargeV;
-    float DischargeV;
-    float ChargeI;
-    float DischargeI;
+    float ChargeVMax;
+    float DischargeVMin;
+    float ChargeIMax;
+    float DischargeIMax;
     float SOC10V;
     float SOC90V;
-} EEPROMSettings;
+} BMSSettings;
+
+typedef struct {
+    float CurI;
+    float CurChargeIMax;   // there seems to be a check on those values, CCGX does not recognize BMS when I-Values are zero
+    float CurDischargeIMax;
+    byte bmsstatus = Boot;
+    uint16_t SOC = 0;
+    uint16_t SOH = 100;
+    int menuload = 0;
+    unsigned char alarm[4] = {0, 0, 0, 0};
+    unsigned char warn[4] = {0, 0, 0, 0};
+} BMSStatus;

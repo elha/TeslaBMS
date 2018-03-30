@@ -27,7 +27,12 @@
 #include "Logger.h"
 #include "BMSModuleManager.h"
 
-template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; } //Lets us stream SerialUSB
+template <class T>
+inline Print &operator<<(Print &obj, T arg)
+{
+    obj.print(arg);
+    return obj;
+} //Lets us stream SerialUSB
 
 extern BMSModuleManager bms;
 
@@ -35,34 +40,41 @@ bool printPrettyDisplay;
 uint32_t prettyCounter;
 int whichDisplay;
 
-SerialConsole::SerialConsole() {
+SerialConsole::SerialConsole()
+{
     init();
 }
 
-void SerialConsole::init() {
+void SerialConsole::init()
+{
     //State variables for serial console
     ptrBuffer = 0;
     state = STATE_ROOT_MENU;
-    loopcount=0;
-    cancel=false;
+    loopcount = 0;
+    cancel = false;
     printPrettyDisplay = false;
     prettyCounter = 0;
     whichDisplay = 0;
 }
 
-void SerialConsole::loop() {  
-    if (SERIALCONSOLE.available()) {
+void SerialConsole::loop()
+{
+    if (SERIALCONSOLE.available())
+    {
         serialEvent();
     }
     if (printPrettyDisplay && (millis() > (prettyCounter + 3000)))
     {
         prettyCounter = millis();
-        if (whichDisplay == 0) bms.printPackSummary();
-        if (whichDisplay == 1) bms.printPackDetails();
+        if (whichDisplay == 0)
+            bms.printPackSummary();
+        if (whichDisplay == 1)
+            bms.printPackDetails();
     }
 }
-              
-void SerialConsole::printMenu() {   
+
+void SerialConsole::printMenu()
+{
     Logger::console("\n*************SYSTEM MENU *****************");
     Logger::console("Enable line endings of some sort (LF, CR, CRLF)");
     Logger::console("Most commands case sensitive\n");
@@ -76,54 +88,57 @@ void SerialConsole::printMenu() {
     Logger::console("   B = Attempt balancing for 5 seconds");
     Logger::console("   p = Toggle output of pack summary every 3 seconds");
     Logger::console("   d = Toggle output of pack details every 3 seconds");
-  
-    Logger::console("   LOGLEVEL=%i - set log level (0=debug, 1=info, 2=warn, 3=error, 4=off)", Logger::getLogLevel());
 
-    float OverVSetpoint;
-    float UnderVSetpoint;
-    float OverTSetpoint;
-    float UnderTSetpoint;
-    float balanceVoltage;
-    float balanceHyst;
+    Logger::console("   LOGLEVEL=%i - set log level (0=debug, 1=info, 2=warn, 3=error, 4=off)", Logger::getLogLevel());
 }
 
 /*	There is a help menu (press H or h or ?)
 
     Commands are submitted by sending line ending (LF, CR, or both)
  */
-void SerialConsole::serialEvent() {
+void SerialConsole::serialEvent()
+{
     int incoming;
     incoming = SERIALCONSOLE.read();
-    if (incoming == -1) { //false alarm....
+    if (incoming == -1)
+    { //false alarm....
         return;
     }
 
-    if (incoming == 10 || incoming == 13) { //command done. Parse it.
+    if (incoming == 10 || incoming == 13)
+    { //command done. Parse it.
         handleConsoleCmd();
         ptrBuffer = 0; //reset line counter once the line has been processed
-    } else {
-        cmdBuffer[ptrBuffer++] = (unsigned char) incoming;
+    }
+    else
+    {
+        cmdBuffer[ptrBuffer++] = (unsigned char)incoming;
         if (ptrBuffer > 79)
             ptrBuffer = 79;
     }
 }
 
-void SerialConsole::handleConsoleCmd() {
+void SerialConsole::handleConsoleCmd()
+{
 
-    if (state == STATE_ROOT_MENU) {
-        if (ptrBuffer == 1) { //command is a single ascii character
+    if (state == STATE_ROOT_MENU)
+    {
+        if (ptrBuffer == 1)
+        { //command is a single ascii character
             handleShortCmd();
-        } else { //if cmd over 1 char then assume (for now) that it is a config line
+        }
+        else
+        { //if cmd over 1 char then assume (for now) that it is a config line
             //handleConfigCmd();
         }
     }
 }
 
-void SerialConsole::handleShortCmd() 
+void SerialConsole::handleShortCmd()
 {
     uint8_t val;
 
-    switch (cmdBuffer[0]) 
+    switch (cmdBuffer[0])
     {
     case 'h':
     case '?':
@@ -150,10 +165,11 @@ void SerialConsole::handleShortCmd()
         bms.renumberBoardIDs();
         break;
     case 'B':
-        bms.balanceCells();
-        break;    
+        //bms.balanceCells(settings.);
+        break;
     case 'p':
-        if (whichDisplay == 1 && printPrettyDisplay) whichDisplay = 0;
+        if (whichDisplay == 1 && printPrettyDisplay)
+            whichDisplay = 0;
         else
         {
             printPrettyDisplay = !printPrettyDisplay;
@@ -168,7 +184,8 @@ void SerialConsole::handleShortCmd()
         }
         break;
     case 'd':
-        if (whichDisplay == 0 && printPrettyDisplay) whichDisplay = 1;
+        if (whichDisplay == 0 && printPrettyDisplay)
+            whichDisplay = 1;
         else
         {
             printPrettyDisplay = !printPrettyDisplay;
@@ -180,66 +197,193 @@ void SerialConsole::handleShortCmd()
             else
             {
                 Logger::console("No longer displaying pack details.");
-            }            
+            }
         }
         break;
     }
+    /*
+
+void loop_menu()
+{
+  if (SERIALCONSOLE.available() == 0)
+    return;
+
+  byte incomingByte = Serial.read(); // read the incoming byte:
+
+  if (status.menuload == 2)
+  {
+    switch (incomingByte)
+    {
+
+    case 113: //c for calibrate zero offset
+
+      status.menuload = 0;
+      incomingByte = 115;
+      break;
+
+    default:
+      // if nothing else matches, do the default
+      // default is optional
+      break;
+    }
+  }
+  if (status.menuload == 3)
+  {
+    switch (incomingByte)
+    {
+    case 113: //q to go back to main menu
+
+      status.menuload = 0;
+      incomingByte = 115;
+      break;
+
+    case 102: //f factory settings
+      setup_settings();
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.println("  ");
+      break;
+
+    case 100: //d display settings
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.OverVSetpoint * 1000, 0);
+      SERIALCONSOLE.print("mV Over Voltage Setpoint - 1 ");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.UnderVSetpoint * 1000, 0);
+      SERIALCONSOLE.print("mV Under Voltage Setpoint - 2");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.OverTSetpoint);
+      SERIALCONSOLE.print(" Over Temperature Setpoint - 3");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.UnderTSetpoint);
+      SERIALCONSOLE.print(" Under Temperature Setpoint - 4");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.BalanceV * 1000, 0);
+      SERIALCONSOLE.print("mV Balance Voltage Setpoint - 5 ");
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.print(settings.BalanceVHyst * 1000, 0);
+      SERIALCONSOLE.print("mV Balance Voltage Hystersis - 6 ");
+      SERIALCONSOLE.println("  ");
+      break;
+
+    case 101: //e display settings
+      SERIALCONSOLE.println("  ");
+      SERIALCONSOLE.println("Enter Variable Number and New value ");
+      SERIALCONSOLE.println("  ");
+      break;
+
+    case 49: //1 Over Voltage Setpoint
+      if (Serial.available() > 0)
+      {
+        settings.OverVSetpoint = Serial.parseInt();
+        settings.OverVSetpoint = settings.OverVSetpoint / 1000;
+        SERIALCONSOLE.print(settings.OverVSetpoint * 1000, 0);
+        SERIALCONSOLE.print("mV Over Voltage Setpoint");
+      }
+      break;
+
+    case 50: //2 Under Voltage Setpoint
+      if (Serial.available() > 0)
+      {
+        settings.UnderVSetpoint = Serial.parseInt();
+        settings.UnderVSetpoint = settings.UnderVSetpoint / 1000;
+        SERIALCONSOLE.print(settings.UnderVSetpoint * 1000, 0);
+        SERIALCONSOLE.print("mV Over Voltage Setpoint");
+      }
+      break;
+
+    case 51: //3 Over Temperature Setpoint
+      if (Serial.available() > 0)
+      {
+        settings.OverTSetpoint = Serial.parseInt();
+        SERIALCONSOLE.print(settings.OverTSetpoint);
+        SERIALCONSOLE.print(" Over Temperature Setpoint");
+      }
+      break;
+
+    case 52: //4 Udner Temperature Setpoint
+      if (Serial.available() > 0)
+      {
+        settings.UnderTSetpoint = Serial.parseInt();
+        SERIALCONSOLE.print(settings.UnderTSetpoint);
+        SERIALCONSOLE.print(" Under Temperature Setpoint");
+      }
+      break;
+
+    case 53: //5 Balance Voltage Setpoint
+      if (Serial.available() > 0)
+      {
+        settings.BalanceV = Serial.parseInt();
+        settings.BalanceV = settings.BalanceV / 1000;
+        SERIALCONSOLE.print(settings.BalanceV * 1000, 0);
+        SERIALCONSOLE.print("mV Balance Voltage Setpoint");
+      }
+      break;
+
+    case 54: //6 Balance Voltage Hystersis
+      if (Serial.available() > 0)
+      {
+        settings.BalanceVHyst = Serial.parseInt();
+        settings.BalanceVHyst = settings.BalanceVHyst / 1000;
+        SERIALCONSOLE.print(settings.BalanceVHyst * 1000, 0);
+        SERIALCONSOLE.print("mV Balance Voltage Hystersis");
+      }
+      break;
+    }
+  }
+
+  if (status.menuload == 1)
+  {
+    switch (incomingByte)
+    {
+    case 113: //q to go back to main menu
+      status.menuload = 0;
+      break;
+
+    case 99: //c for calibrate zero offset
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println("Current Sensor Calibration Menu");
+      SERIALCONSOLE.println("c - To calibrate sensor offset");
+      SERIALCONSOLE.println("s - To switch between Current Sensors");
+      SERIALCONSOLE.println("q - Go back to menu");
+      status.menuload = 2;
+      break;
+
+    case 98: //c for calibrate zero offset
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println();
+      SERIALCONSOLE.println("Battery Settings Menu");
+      SERIALCONSOLE.println("r - Reset AH counter");
+      SERIALCONSOLE.println("d - Display settings");
+      SERIALCONSOLE.println("e - Edit settings");
+      SERIALCONSOLE.println("q - Go back to menu");
+      status.menuload = 3;
+      break;
+
+    default:
+      // if nothing else matches, do the default
+      // default is optional
+      break;
+    }
+  }
+
+  if (incomingByte == 115 & status.menuload == 0)
+  {
+    SERIALCONSOLE.println();
+    SERIALCONSOLE.println("MENU");
+    SERIALCONSOLE.println("Debugging Paused");
+    SERIALCONSOLE.println("c - Current Sensor Calibration");
+    SERIALCONSOLE.println("b - Battery Settings");
+    SERIALCONSOLE.println("q - exit menu");
+    status.menuload = 1;
+  }
 }
-
-/*
-    if (SERIALCONSOLE.available()) 
-    {     
-        char y = SERIALCONSOLE.read();
-        switch (y)
-        {
-        case '1': //ascii 1
-            renumberBoardIDs();  // force renumber and read out
-            break;
-        case '2': //ascii 2
-            SERIALCONSOLE.println();
-            findBoards();
-            break;
-        case '3': //activate cell balance for 5 seconds 
-            SERIALCONSOLE.println();
-            SERIALCONSOLE.println("Balancing");
-            cellBalance();
-            break;
-      case '4': //clear all faults on all boards, required after Reset or FPO (first power on)
-       SERIALCONSOLE.println();
-       SERIALCONSOLE.println("Clearing Faults");
-       clearFaults();
-      break;
-
-      case '5': //read out the status of first board
-       SERIALCONSOLE.println();
-       SERIALCONSOLE.println("Reading status");
-       readStatus(1);
-      break;
-
-      case '6': //Read out the limit setpoints of first board
-       SERIALCONSOLE.println();
-       SERIALCONSOLE.println("Reading Setpoints");
-       readSetpoint(1);
-       SERIALCONSOLE.println(OVolt);
-       SERIALCONSOLE.println(UVolt);
-       SERIALCONSOLE.println(Tset);
-      break; 
-                
-      case '0': //Send all boards into Sleep state
-       Serial.println();
-       Serial.println("Sleep Mode");
-       sleepBoards();
-      break;
-
-      case '9'://Pull all boards out of Sleep state
-       Serial.println();
-       Serial.println("Wake Boards");
-       wakeBoards();
-      break;          
-                      
-        }
-    }     
- */
-
-
-
+    */
+}

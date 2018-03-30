@@ -4,9 +4,9 @@
 
 class BMSModuleManager
 {
-public:
+  public:
     BMSModuleManager();
-    void balanceCells();
+    bool balanceCells(float minDiffV);
     void setupBoards();
     void findBoards();
     void renumberBoardIDs();
@@ -28,29 +28,12 @@ public:
     float getHighCellVolt();
     float getHighVoltage();
     float getLowVoltage();
-    /*
-    void processCANMsg(CAN_FRAME &frame);
-    */
     void printPackSummary();
     void printPackDetails();
-    
 
-private:
-    float packVolt;                         // All modules added together
-    float LowCellVolt;
-    float HighCellVolt;
-    float lowestPackVolt;
-    float highestPackVolt;
-    float lowestPackTemp;
-    float highestPackTemp;
+  private:
     BMSModule modules[MAX_MODULE_ADDR + 1]; // store data for as many modules as we've configured for.
     int batteryID;
-    int numFoundModules;                    // The number of modules that seem to exist
+    int numFoundModules; // The number of modules that seem to exist
     bool isFaulted;
-    /*
-    void sendBatterySummary();
-    void sendModuleSummary(int module);
-    void sendCellDetails(int module, int cell);
-    */
-    
 };

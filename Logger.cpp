@@ -34,7 +34,8 @@ uint32_t Logger::lastLogTime = 0;
  * printf() style, see Logger::log()
  *
  */
-void Logger::debug(char *message, ...) {
+void Logger::debug(char *message, ...)
+{
     if (logLevel > Debug)
         return;
     va_list args;
@@ -47,7 +48,8 @@ void Logger::debug(char *message, ...) {
  * Output a info message with a variable amount of parameters
  * printf() style, see Logger::log()
  */
-void Logger::info(char *message, ...) {
+void Logger::info(char *message, ...)
+{
     if (logLevel > Info)
         return;
     va_list args;
@@ -60,7 +62,8 @@ void Logger::info(char *message, ...) {
  * Output a warning message with a variable amount of parameters
  * printf() style, see Logger::log()
  */
-void Logger::warn(char *message, ...) {
+void Logger::warn(char *message, ...)
+{
     if (logLevel > Warn)
         return;
     va_list args;
@@ -73,7 +76,8 @@ void Logger::warn(char *message, ...) {
  * Output a error message with a variable amount of parameters
  * printf() style, see Logger::log()
  */
-void Logger::error(char *message, ...) {
+void Logger::error(char *message, ...)
+{
     if (logLevel > Error)
         return;
     va_list args;
@@ -86,7 +90,8 @@ void Logger::error(char *message, ...) {
  * Output a comnsole message with a variable amount of parameters
  * printf() style, see Logger::logMessage()
  */
-void Logger::console(char *message, ...) {
+void Logger::console(char *message, ...)
+{
     va_list args;
     va_start(args, message);
     Logger::logMessage(message, args);
@@ -96,21 +101,24 @@ void Logger::console(char *message, ...) {
 /*
  * Set the log level. Any output below the specified log level will be omitted.
  */
-void Logger::setLoglevel(LogLevel level) {
+void Logger::setLoglevel(LogLevel level)
+{
     logLevel = level;
 }
 
 /*
  * Retrieve the current log level.
  */
-Logger::LogLevel Logger::getLogLevel() {
+Logger::LogLevel Logger::getLogLevel()
+{
     return logLevel;
 }
 
 /*
  * Return a timestamp when the last log entry was made.
  */
-uint32_t Logger::getLastLogTime() {
+uint32_t Logger::getLastLogTime()
+{
     return lastLogTime;
 }
 
@@ -124,7 +132,8 @@ uint32_t Logger::getLastLogTime() {
  *    Logger::debug("current time: %d", millis());
  * }
  */
-boolean Logger::isDebug() {
+boolean Logger::isDebug()
+{
     return logLevel == Debug;
 }
 
@@ -146,12 +155,14 @@ boolean Logger::isDebug() {
  * %t - prints the next parameter as boolean ('T' or 'F')
  * %T - prints the next parameter as boolean ('true' or 'false')
  */
-void Logger::log(LogLevel level, char *format, va_list args) {
+void Logger::log(LogLevel level, char *format, va_list args)
+{
     lastLogTime = millis();
     SERIALCONSOLE.print(lastLogTime);
     SERIALCONSOLE.print(" - ");
 
-    switch (level) {
+    switch (level)
+    {
     case Debug:
         SERIALCONSOLE.print("DEBUG");
         break;
@@ -188,76 +199,95 @@ void Logger::log(LogLevel level, char *format, va_list args) {
  * %t - prints the next parameter as boolean ('T' or 'F')
  * %T - prints the next parameter as boolean ('true' or 'false')
  */
-void Logger::logMessage(char *format, va_list args) {
-    for (; *format != 0; ++format) {
-        if (*format == '%') {
+void Logger::logMessage(char *format, va_list args)
+{
+    for (; *format != 0; ++format)
+    {
+        if (*format == '%')
+        {
             ++format;
             if (*format == '\0')
                 break;
-            if (*format == '%') {
+            if (*format == '%')
+            {
                 SERIALCONSOLE.print(*format);
                 continue;
             }
-            if (*format == 's') {
-                register char *s = (char *) va_arg( args, int );
+            if (*format == 's')
+            {
+                register char *s = (char *)va_arg(args, int);
                 SERIALCONSOLE.print(s);
                 continue;
             }
-            if (*format == 'd' || *format == 'i') {
-                SERIALCONSOLE.print(va_arg( args, int ), DEC);
+            if (*format == 'd' || *format == 'i')
+            {
+                SERIALCONSOLE.print(va_arg(args, int), DEC);
                 continue;
             }
-            if (*format == 'f') {
-                SERIALCONSOLE.print(va_arg( args, double ), 3);
+            if (*format == 'f')
+            {
+                SERIALCONSOLE.print(va_arg(args, double), 3);
                 continue;
             }
-            if (*format == 'x') {
-                SERIALCONSOLE.print(va_arg( args, int ), HEX);
+            if (*format == 'x')
+            {
+                SERIALCONSOLE.print(va_arg(args, int), HEX);
                 continue;
             }
-            if (*format == 'X') {
+            if (*format == 'X')
+            {
                 SERIALCONSOLE.print("0x");
-                SERIALCONSOLE.print(va_arg( args, int ), HEX);
+                SERIALCONSOLE.print(va_arg(args, int), HEX);
                 continue;
             }
-            if (*format == 'b') {
-                SERIALCONSOLE.print(va_arg( args, int ), BIN);
+            if (*format == 'b')
+            {
+                SERIALCONSOLE.print(va_arg(args, int), BIN);
                 continue;
             }
-            if (*format == 'B') {
+            if (*format == 'B')
+            {
                 SERIALCONSOLE.print("0b");
-                SERIALCONSOLE.print(va_arg( args, int ), BIN);
+                SERIALCONSOLE.print(va_arg(args, int), BIN);
                 continue;
             }
-            if (*format == 'l') {
-                SERIALCONSOLE.print(va_arg( args, long ), DEC);
+            if (*format == 'l')
+            {
+                SERIALCONSOLE.print(va_arg(args, long), DEC);
                 continue;
             }
 
-            if (*format == 'c') {
-                SERIALCONSOLE.print(va_arg( args, int ));
+            if (*format == 'c')
+            {
+                SERIALCONSOLE.print(va_arg(args, int));
                 continue;
             }
-            if (*format == 't') {
-                if (va_arg( args, int ) == 1) {
+            if (*format == 't')
+            {
+                if (va_arg(args, int) == 1)
+                {
                     SERIALCONSOLE.print("T");
-                } else {
+                }
+                else
+                {
                     SERIALCONSOLE.print("F");
                 }
                 continue;
             }
-            if (*format == 'T') {
-                if (va_arg( args, int ) == 1) {
+            if (*format == 'T')
+            {
+                if (va_arg(args, int) == 1)
+                {
                     SERIALCONSOLE.print("TRUE");
-                } else {
+                }
+                else
+                {
                     SERIALCONSOLE.print("FALSE");
                 }
                 continue;
             }
-
         }
         SERIALCONSOLE.print(*format);
     }
     SERIALCONSOLE.println();
 }
-
