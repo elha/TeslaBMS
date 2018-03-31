@@ -51,31 +51,70 @@
 #define EEPROM_VERSION      0x10    //update any time EEPROM struct below is changed.
 #define EEPROM_PAGE         0
 
+#define ERROR_NONE                      0x0
+#define ERROR_HIGHCELLVOLTAGE           0x00000004
+#define ERROR_LOWCELLVOLTAGE            0x00000010
+#define ERROR_HIGHPACKTEMP              0x00000040
+#define ERROR_LOWPACKTEMP               0x00000100
+#define ERROR_HIGHBATTDISCHARGECURRENT  0x00004000
+#define ERROR_HIGHBATTCHARGECURRENT     0x00010000
+#define ERROR_INTERNALFAILURE           0x00400000
+#define ERROR_CELLIMBALANCE             0x01000000
+
+
+
 typedef struct {
     uint8_t version;
     uint8_t logLevel;
-    float OverVSetpoint;
-    float UnderVSetpoint;
-    float OverTSetpoint;
-    float UnderTSetpoint;
-    float BalanceV;
-    float BalanceVHyst;
-    float ChargeVMax;
-    float DischargeVMin;
-    float ChargeIMax;
-    float DischargeIMax;
-    float SOC10V;
-    float SOC90V;
+    
+    float UBattNormMin;
+    float UBattNormMax;
+
+    float UCellWarnMin;
+    float UCellNormMin;
+    float UCellOptiMin;
+
+    float UCellOptiMax;
+    float UCellNormMax;
+    float UCellWarnMax;
+
+    float UCellNormBalanceDiff;
+    float UCellWarnBalanceDiff;
+
+    float IBattWarnChargeMax;
+    float IBattWarnDischargeMax;
+
+    float IBattOptiChargeMax;
+    float IBattOptiDischargeMax;
+
+    float TBattNormMin;
+    float TBattNormMax;
+
+    float UCellSoc10;
+    float UCellSoc90;
 } BMSSettings;
 
 typedef struct {
-    float CurI;
-    float CurChargeIMax;   // there seems to be a check on those values, CCGX does not recognize BMS when I-Values are zero
-    float CurDischargeIMax;
-    byte bmsstatus = Boot;
-    uint16_t SOC = 0;
-    uint16_t SOH = 100;
-    int menuload = 0;
-    unsigned char alarm[4] = {0, 0, 0, 0};
-    unsigned char warn[4] = {0, 0, 0, 0};
+    float UBattCurr          = 44.0f;
+    
+    float UCellCurrMin       = 3.6f;
+    float UCellCurrAvg       = 3.6f;
+    float UCellCurrMax       = 3.6f;
+    float UCellCurrDiff      = 0.0f;
+
+    float IBattCurr          = 0.0f;
+    float IBattCurrCharge    = 0.0f;
+    float IBattCurrDischarge = 0.0f;
+
+    float TBattCurrMin       = 30.0f;
+    float TBattCurrMax       = 30.0f;
+
+    float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
+    float IBattPlanDischargeMax = 0.1f;
+    
+    float SOC = 0.0f;
+    float SOH = 100.0f;
+
+    unsigned long Alarm = ERROR_NONE;
+    unsigned long Error = ERROR_NONE;
 } BMSStatus;

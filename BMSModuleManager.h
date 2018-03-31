@@ -10,18 +10,21 @@ class BMSModuleManager
     void setupBoards();
     void findBoards();
     void renumberBoardIDs();
+    bool isFaulted;  
     void clearFaults();
     void sleepBoards();
     void wakeBoards();
     void getAllVoltTemp();
     void readSetpoints();
-    void setBatteryID(int id);
+    void setBatteryID(int id); 
     void setUnderVolt(float newVal);
     void setOverVolt(float newVal);
     void setOverTemp(float newVal);
     void setBalanceV(float newVal);
     void setBalanceHyst(float newVal);
     float getPackVoltage();
+    float getLowTemperature();
+    float getHighTemperature();
     float getAvgTemperature();
     float getAvgCellVolt();
     float getLowCellVolt();
@@ -35,5 +38,4 @@ class BMSModuleManager
     BMSModule modules[MAX_MODULE_ADDR + 1]; // store data for as many modules as we've configured for.
     int batteryID;
     int numFoundModules; // The number of modules that seem to exist
-    bool isFaulted;
 };

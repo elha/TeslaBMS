@@ -4,40 +4,35 @@
 #include "Logger.h"
 #include "config.h"
 #include "BMSModuleManager.h"
-#include "SerialConsole.h"
 BMSSettings settings;
 BMSStatus status;
 BMSModuleManager bms;
-SerialConsole console;
 
-
-void setup() {
+void setup()
+{
   setup_settings();
   setup_bus();
 
   delay(4000);
 
   setup_bms();
-  
+
   delay(4000);
 }
 
-void loop() {
+void loop()
+{
   loop_readcan();
-  loop_menu();
 
   static unsigned long looptime;
-  if (millis() - looptime > 500) {
+  if (millis() - looptime > 500)
+  {
     looptime = millis();
-    
-    // inputs
-    loop_querybms();
-    
-    // calculations
-    loop_calcsoc();
-    loop_alarm();
 
-    // state machine
+    // input
+    loop_querybatt();
+
+    // logic
     loop_bms();
 
     // output
@@ -46,90 +41,53 @@ void loop() {
   }
 }
 
-void loop_alarm() {
-  status.alarm[0] = 0;
-  if (bms.getHighCellVolt() > settings.OverVSetpoint) {
-    status.alarm[0] = 0x04;
-    Logger::warn("Alarm - high cell voltage %f over %f", bms.getHighCellVolt(),
-                 settings.OverVSetpoint);
-  }
-
-  if (bms.getLowCellVolt() < settings.UnderVSetpoint) {
-    status.alarm[0] |= 0x10;
-    Logger::warn("Alarm - low cell voltage %f under %f", bms.getLowCellVolt(),
-                 settings.UnderVSetpoint);
-  }
-
-  if (bms.getAvgTemperature() > settings.OverTSetpoint) {
-    status.alarm[0] |= 0x40;
-    Logger::warn("Alarm - high battery temp %f over %f",
-                 bms.getAvgTemperature(), settings.OverTSetpoint);
-  }
-
-  status.alarm[1] = 0;
-  if (bms.getAvgTemperature() < settings.UnderTSetpoint) {
-    status.alarm[1] = 0x01;
-    Logger::warn("Alarm - low battery temp %f  under %f",
-                 bms.getAvgTemperature(), settings.UnderTSetpoint);
-  }
-  if (false) {
-    status.alarm[1] = 0x40;
-    Logger::warn("Alarm - high discharge current");
-  }
-
-  status.alarm[2] = 0;
-  if (false) {
-    status.alarm[2] = 0x01;
-    Logger::warn("Alarm - high charge current");
-  }
-  
-  if (false) {
-    status.alarm[2] = 0x40;
-    Logger::warn("Alarm - internal failure");
-  }
-
-  status.alarm[3] = 0;
-  if (false) {
-    status.alarm[3] = 0x01;
-    Logger::warn("Alarm - cell imbalance");
-  }
-}
-
 // setup ###############
 
-void setup_settings() {
+void setup_settings()
+{
   Logger::console("Loading defaults");
   settings.version = 1;
-  settings.OverVSetpoint = 4.1f;
-  settings.UnderVSetpoint = 3.0f;
-  
-  settings.OverTSetpoint = 65.0f;
-  settings.UnderTSetpoint = 10.0f;
-  
-  settings.BalanceV = 3.9f;
-  settings.BalanceVHyst = 0.04f;
+
+  settings.UCellWarnMin = 3.20f;
+  settings.UCellNormMin = 3.30f;
+  settings.UCellOptiMin = 3.40f;
+
+  settings.UCellOptiMax = 3.90f;
+  settings.UCellNormMax = 4.00f;
+  settings.UCellWarnMax = 4.10f;
+
+  settings.UBattNormMin = settings.UCellNormMin * 12.0f; // 12s74p
+  settings.UBattNormMax = settings.UCellNormMax * 12.0f;
+
+  settings.UCellNormBalanceDiff = 0.03f;
+  settings.UCellWarnBalanceDiff = 0.06f;
+
+  settings.IBattWarnChargeMax = 4.0f;
+  settings.IBattWarnDischargeMax = 4.0f;
+  settings.IBattOptiChargeMax = 1.5f;
+  settings.IBattOptiDischargeMax = 1.5f;
+
+  settings.TBattNormMin = 10.0f;
+  settings.TBattNormMax = 45.0f;
 
   settings.logLevel = Logger::Info;
 
-  settings.ChargeVMax = 48.0f;
-  settings.DischargeVMin = 40.0f;
-  settings.ChargeIMax = 2.0f;
-  settings.DischargeIMax = 2.0f;
-
-  settings.SOC10V = 3.1f;
-  settings.SOC90V = 4.1f;
+  settings.UCellSoc10 = 3.1f;
+  settings.UCellSoc90 = 4.1f;
 }
 
-void setup_bus() {
-  CANVE.begin(500000);          // VE.Can to CCGX
+void setup_bus()
+{
   SERIALCONSOLE.begin(115200); // USB serial
   SERIALBMS.begin(612500);     // Tesla serial bus
+  CANVE.begin(500000);         // VE.Can to CCGX
 
   Logger::setLoglevel((Logger::LogLevel)settings.logLevel);
   Logger::console("Initializing ...");
 }
 
-void setup_bms() {
+void setup_bms()
+{
   bms.renumberBoardIDs();
   bms.findBoards();
   bms.clearFaults();
@@ -137,84 +95,131 @@ void setup_bms() {
 
 // loop ###############
 
-void loop_querybms() { bms.getAllVoltTemp(); }
+void loop_querybatt()
+{
+  bms.getAllVoltTemp();
+  status.UCellCurrMin = bms.getLowCellVolt();
+  status.UCellCurrAvg = bms.getAvgCellVolt();
+  status.UCellCurrMax = bms.getHighCellVolt();
+  status.UCellCurrDiff = status.UCellCurrMax - status.UCellCurrMin;
+  status.UBattCurr = bms.getPackVoltage();
+  status.TBattCurrMin = bms.getLowTemperature();
+  status.TBattCurrMax = bms.getHighTemperature();
+  status.SOC = (float)map(uint16_t(status.UCellCurrAvg * 1000),
+                          uint16_t(settings.UCellSoc10 * 1000),
+                          uint16_t(settings.UCellSoc90 * 1000), 1000, 9000) * 0.01f;
+  status.SOH = 100.0f;
+  status.IBattCurr = 2.15f; // TODO
+}
 
-void loop_bms() {
-  status.CurChargeIMax = 0.01; //settings.ChargeIMax;
-  status.CurDischargeIMax = 0.01 ;//settings.DischargeIMax;
-  
-  if (bms.getLowCellVolt() < settings.UnderVSetpoint) {
-    status.bmsstatus = Err;
+void loop_bms()
+{
+  // Charging and Discharging in 4 stages
+  // is opti: Full Dis-/Charge
+  // or is norm: linear Dis-/Charge from Full to zero
+  // or is warn: zero Dis-/Charge and warning
+  // otherwise is error: zero Dis-/Charge and error
+
+  status.Alarm = ERROR_NONE;
+  status.Error = ERROR_NONE;
+
+  if (status.UCellCurrMax < settings.UCellOptiMax)
+  {
+    status.IBattPlanChargeMax = settings.IBattOptiChargeMax;
   }
-
-  switch (status.bmsstatus) {
-  case (Boot):
-    status.bmsstatus = Ready;
-    break;
-
-  case (Ready):
-    status.bmsstatus = Charge;
-    break;
-
-  case (Drive):
-    break;
-
-  case (Charge):
-    if (bms.getHighCellVolt() > settings.BalanceV)
-      if(bms.balanceCells(settings.BalanceVHyst))
+  else if (status.UCellCurrMax < settings.UCellNormMax)
+  {
+    if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
+      if (bms.balanceCells(settings.UCellNormBalanceDiff))
         Logger::info("Balancing Pack");
 
-    if (bms.getHighCellVolt() > settings.OverVSetpoint)
-      status.bmsstatus = Ready;
+    status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);
+  }
+  else if (status.UCellCurrMax < settings.UCellWarnMax)
+  {
+    if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
+      if (bms.balanceCells(settings.UCellNormBalanceDiff))
+        Logger::info("Balancing Pack");
 
-    break;
+    status.IBattPlanChargeMax = 0;
+    status.Alarm |= ERROR_HIGHCELLVOLTAGE;
+  }
+  else //if (status.UCellCurrMax < settings.UCellErrorMax) or worse
+  {
+    status.IBattPlanChargeMax = 0;
+    status.Error |= ERROR_HIGHCELLVOLTAGE;
+  }
 
-  case (Err):
-    if (bms.getLowCellVolt() >= settings.UnderVSetpoint)
-      status.bmsstatus = Ready;
+  if (status.UCellCurrMin > settings.UCellOptiMin)
+  {
+    status.IBattPlanDischargeMax = settings.IBattOptiDischargeMax;
+  }
+  else if (status.UCellCurrMin > settings.UCellNormMin)
+  {
+    status.IBattPlanDischargeMax = settings.IBattOptiDischargeMax * (status.UCellCurrMin - settings.UCellNormMin) / (settings.UCellOptiMin - settings.UCellNormMin);
+  }
+  else if (status.UCellCurrMin > settings.UCellWarnMin)
+  {
+    status.IBattPlanDischargeMax = 0;
+    status.Alarm |= ERROR_LOWCELLVOLTAGE;
+  }
+  else //if (status.UCellCurrMin > settings.UCellErrorMin) or worse
+  {
+    status.IBattPlanDischargeMax = 0;
+    status.Error |= ERROR_LOWCELLVOLTAGE;
+  }
 
-    break;
+  // check errors could implement warnings
+  if (status.TBattCurrMax > settings.TBattNormMax)
+  {
+    status.Error |= ERROR_HIGHPACKTEMP;
+    Logger::error("Alarm - high battery temp %f over %f", status.TBattCurrMax, settings.TBattNormMax);
+  }
+
+  if (status.TBattCurrMin < settings.TBattNormMin)
+  {
+    status.Error |= ERROR_LOWPACKTEMP;
+    Logger::error("Alarm - low battery temp %f under %f", status.TBattCurrMin, settings.TBattNormMin);
+  }
+
+  if (status.IBattCurrDischarge > settings.IBattWarnDischargeMax)
+  {
+    status.Error |= ERROR_HIGHBATTDISCHARGECURRENT;
+    Logger::error("Alarm - high discharge current %f over %f", status.IBattCurrDischarge, settings.IBattWarnDischargeMax);
+  }
+
+  if (status.IBattCurrCharge > settings.IBattWarnChargeMax)
+  {
+    status.Error |= ERROR_HIGHBATTCHARGECURRENT;
+    Logger::error("Alarm - high charge current %f over %f", status.IBattCurrCharge, settings.IBattWarnChargeMax);
+  }
+
+  if (bms.isFaulted)
+  {
+    status.Error |= ERROR_INTERNALFAILURE;
+    Logger::error("Alarm - internal failure");
+  }
+
+  if (status.UCellCurrDiff > settings.UCellWarnBalanceDiff)
+  {
+    status.Error |= ERROR_CELLIMBALANCE;
+    Logger::error("Alarm - cell imbalance");
+  }
+
+  // shut off charging/discharging on Warning or Error
+  if (status.Error != 0 || status.Alarm != 0)
+  {
+    status.IBattPlanChargeMax = 0;
+    status.IBattPlanDischargeMax = 0;
   }
 }
 
-void loop_debug() {
+void loop_debug()
+{
   if (settings.logLevel > Logger::Info)
     return;
 
-  SERIALCONSOLE.println();
-  SERIALCONSOLE.println();
-  SERIALCONSOLE.println();
-  SERIALCONSOLE.print("BMS Status : ");
-  SERIALCONSOLE.print(status.bmsstatus);
-  switch (status.bmsstatus) {
-  case (Boot):
-    SERIALCONSOLE.print(" Boot ");
-    break;
-
-  case (Ready):
-    SERIALCONSOLE.print(" Ready ");
-    break;
-
-  case (Drive):
-    SERIALCONSOLE.print(" Drive ");
-    break;
-
-  case (Charge):
-    SERIALCONSOLE.print(" Charge ");
-    break;
-
-  case (Err):
-    SERIALCONSOLE.print(" Error ");
-    break;
-  }
-  SERIALCONSOLE.print("  ");
   bms.printPackDetails();
-}
-
-void loop_calcsoc() {
-  status.SOC = map(uint16_t(bms.getAvgCellVolt() * 1000),
-                   uint16_t(settings.SOC10V * 1000),
-                   uint16_t(settings.SOC90V * 1000), 10, 90);
 }
 
 void loop_vecan() // communication with Victron system over CAN
@@ -225,26 +230,26 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x351;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(settings.ChargeVMax * 10));
-  msg.buf[1] = highByte(uint16_t(settings.ChargeVMax * 10));
-  msg.buf[2] = lowByte(uint16_t(status.CurChargeIMax * 10)); 
-  msg.buf[3] = highByte(uint16_t(status.CurChargeIMax * 10));
-  msg.buf[4] = lowByte(uint16_t(status.CurDischargeIMax * 10));
-  msg.buf[5] = highByte(uint16_t(status.CurDischargeIMax * 10));
-  msg.buf[6] = lowByte(uint16_t(settings.DischargeVMin * 10));
-  msg.buf[7] = highByte(uint16_t(settings.DischargeVMin * 10));
+  msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10));
+  msg.buf[1] = highByte(uint16_t(settings.UBattNormMax * 10));
+  msg.buf[2] = lowByte(uint16_t(status.IBattPlanChargeMax * 10));
+  msg.buf[3] = highByte(uint16_t(status.IBattPlanChargeMax * 10));
+  msg.buf[4] = lowByte(uint16_t(status.IBattPlanDischargeMax * 10));
+  msg.buf[5] = highByte(uint16_t(status.IBattPlanDischargeMax * 10));
+  msg.buf[6] = lowByte(uint16_t(settings.UBattNormMin * 10));
+  msg.buf[7] = highByte(uint16_t(settings.UBattNormMin * 10));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
   msg.ext = 0;
   msg.id = 0x355;
   msg.len = 8;
-  msg.buf[0] = lowByte(status.SOC);
-  msg.buf[1] = highByte(status.SOC);
-  msg.buf[2] = lowByte(status.SOH);
-  msg.buf[3] = highByte(status.SOH);
-  msg.buf[4] = lowByte(status.SOC * 100);
-  msg.buf[5] = highByte(status.SOC * 100);
+  msg.buf[0] = lowByte(uint16_t(status.SOC));
+  msg.buf[1] = highByte(uint16_t(status.SOC));
+  msg.buf[2] = lowByte(uint16_t(status.SOH));
+  msg.buf[3] = highByte(uint16_t(status.SOH));
+  msg.buf[4] = lowByte(uint16_t(status.SOC * 100));
+  msg.buf[5] = highByte(uint16_t(status.SOC * 100));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -253,12 +258,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x356;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(bms.getPackVoltage() * 100));
-  msg.buf[1] = highByte(uint16_t(bms.getPackVoltage() * 100));
-  msg.buf[2] = lowByte(long(status.CurI / 100));
-  msg.buf[3] = highByte(long(status.CurI / 100));
-  msg.buf[4] = lowByte(uint16_t(bms.getAvgTemperature() * 10));
-  msg.buf[5] = highByte(uint16_t(bms.getAvgTemperature() * 10));
+  msg.buf[0] = lowByte(uint16_t(status.UBattCurr * 100));
+  msg.buf[1] = highByte(uint16_t(status.UBattCurr * 100));
+  msg.buf[2] = lowByte(uint16_t(status.IBattCurr * 10));
+  msg.buf[3] = highByte(uint16_t(status.IBattCurr * 10));
+  msg.buf[4] = lowByte(uint16_t(status.TBattCurrMax * 10));
+  msg.buf[5] = highByte(uint16_t(status.TBattCurrMax * 10));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -267,18 +272,16 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x35A;
   msg.len = 8;
-  msg.buf[0] = status.alarm[0]; // High temp  | Low Voltage | High Voltage
-  msg.buf[1] = status.alarm[1]; // High Discharge Current | Low Temperature
-  msg.buf[2] = status.alarm[2]; // Internal Failure | High Charge current
-  msg.buf[3] = status.alarm[3]; // Cell Imbalance
-  msg.buf[4] = status.warn[0];  // bits identical to alarm
-  msg.buf[5] = status.warn[1];
-  msg.buf[6] = status.warn[2];
-  msg.buf[7] = status.warn[3];
+  msg.buf[0] = (byte)((status.Error >>  0) & 0xFF); // High temp  | Low Voltage | High Voltage
+  msg.buf[1] = (byte)((status.Error >>  8) & 0xFF); // High Discharge Current | Low Temperature
+  msg.buf[2] = (byte)((status.Error >> 16) & 0xFF); // Internal Failure | High Charge current
+  msg.buf[3] = (byte)((status.Error >> 24) & 0xFF); // Cell Imbalance
+  msg.buf[4] = (byte)((status.Alarm >>  0) & 0xFF); // High temp  | Low Voltage | High Voltage
+  msg.buf[5] = (byte)((status.Alarm >>  8) & 0xFF); // High Discharge Current | Low Temperature
+  msg.buf[6] = (byte)((status.Alarm >> 16) & 0xFF); // Internal Failure | High Charge current
+  msg.buf[7] = (byte)((status.Alarm >> 24) & 0xFF); // Cell Imbalance
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
-
-  delay(5);
 
   // bmsname
   msg.ext = 0;
@@ -294,8 +297,6 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[7] = 'S';
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
-
-  delay(5);
 
   // bmsmanufacturer
   msg.ext = 0;
@@ -313,13 +314,13 @@ void loop_vecan() // communication with Victron system over CAN
   CANVE.write(msg);
 }
 
-void loop_menu() { console.loop(); }
-
-void loop_readcan() {
+void loop_readcan()
+{
   CAN_message_t msgin;
   if (!CANVE.available())
-      CANVE.read(msgin);
+    CANVE.read(msgin);
 
-
-  // status.CurI = CANmilliamps / 1000;
+  // status.IBattCurr = CANmilliamps / 1000;
+  // status.IBattCurrCharge = CANmilliamps / 1000;
+  // status.IBattCurrDischarge = CANmilliamps / 1000;
 }

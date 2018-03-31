@@ -324,6 +324,38 @@ float BMSModuleManager::getAvgTemperature()
     return avg;
 }
 
+float BMSModuleManager::getLowTemperature()
+{
+    float Low = 100.0f;
+    for (int x = 1; x <= MAX_MODULE_ADDR; x++)
+    {
+        if (modules[x].isExisting())
+        {
+            if (modules[x].getLowTemp() < Low)
+            {
+                Low = modules[x].getLowTemp();
+            }
+        }
+    }
+    return Low;
+}
+
+float BMSModuleManager::getHighTemperature()
+{
+    float High = 0.0f;
+    for (int x = 1; x <= MAX_MODULE_ADDR; x++)
+    {
+        if (modules[x].isExisting())
+        {
+            if (modules[x].getHighTemp() > High)
+            {
+                High = modules[x].getHighTemp();
+            }
+        }
+    }
+    return High;
+}
+
 float BMSModuleManager::getAvgCellVolt()
 {
     float avg = 0.0f;

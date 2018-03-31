@@ -81,8 +81,8 @@ bool BMSModule::readModuleValues()
     uint8_t calcCRC;
     bool retVal = false;
     int retLen;
-    float tempCalc;
-    float tempTemp;
+    double tempCalc;
+    double tempTemp;
 
     payload[0] = moduleAddress << 1;
 
@@ -115,25 +115,21 @@ bool BMSModule::readModuleValues()
         if (buff[0] == (moduleAddress << 1) && buff[1] == REG_GPAI && buff[2] == 0x12) //Also ensure this is actually the reply to our intended query
         {
             //payload is 2 bytes gpai, 2 bytes for each of 6 cell voltages, 2 bytes for each of two temperatures (18 bytes of data)
-            moduleVolt = (buff[3] * 256 + buff[4]) * 0.002034609f;
+            moduleVolt = ((double)(buff[3] * 256 + buff[4]) * 0.002048544678082l); // was 4% off (against sum(cellVolts) and measurements)
             
             for (int i = 0; i < 6; i++)
             {
-                cellVolt[i] = (buff[5 + (i * 2)] * 256 + buff[6 + (i * 2)]) * 0.000381493f;
-             
+                cellVolt[i] = ((double)(buff[5 + (i * 2)] * 256 + buff[6 + (i * 2)]) * 0.000381493l);
             }
-
-            //Now using steinhart/hart equation for temperatures. We'll see if it is better than old code.
-            tempTemp = (1.78f / ((buff[17] * 256 + buff[18] + 2) / 33046.0f) - 3.57f);
-            tempTemp *= 1000.0f;
-            tempCalc = 1.0f / (0.0007610373573f + (0.0002728524832 * logf(tempTemp)) + (powf(logf(tempTemp), 3) * 0.0000001022822735f));
-
-            temperatures[0] = tempCalc - 273.15f;
-
-            tempTemp = 1.78f / ((buff[19] * 256 + buff[20] + 9) / 33068.0f) - 3.57f;
-            tempTemp *= 1000.0f;
-            tempCalc = 1.0f / (0.0007610373573f + (0.0002728524832 * logf(tempTemp)) + (powf(logf(tempTemp), 3) * 0.0000001022822735f));
-            temperatures[1] = tempCalc - 273.15f;
+            
+            for (int i = 0; i < 2; i++)
+            {
+                //Now using steinhart/hart equation for temperatures. We'll see if it is better than old code.
+                tempTemp = (1.78l / ((double)(buff[17 + (i * 2)] * 256 + buff[18  + (i * 2)] + 2) / 33046.0l) - 3.57l);
+                tempTemp *= 1000.0l;
+                tempCalc = 1.0l / (0.0007610373573l + (0.0002728524832l * logf(tempTemp)) + (powf(logf(tempTemp), 3) * 0.0000001022822735l));
+                temperatures[i] = tempCalc - 273.15f;
+            }
 
             Logger::debug("Got voltage and temperature readings");
             retVal = true;
