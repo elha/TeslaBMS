@@ -71,9 +71,6 @@ void setup_settings()
   settings.TBattNormMax = 45.0f;
 
   settings.logLevel = Logger::Info;
-
-  settings.UCellSoc10 = 3.1f;
-  settings.UCellSoc90 = 4.1f;
 }
 
 void setup_bus()
@@ -98,17 +95,21 @@ void setup_bms()
 void loop_querybatt()
 {
   bms.getAllVoltTemp();
+  status.UBattCurr = bms.getPackVoltage();
+  
   status.UCellCurrMin = bms.getLowCellVolt();
   status.UCellCurrAvg = bms.getAvgCellVolt();
   status.UCellCurrMax = bms.getHighCellVolt();
-  status.UCellCurrDiff = status.UCellCurrMax - status.UCellCurrMin;
-  status.UBattCurr = bms.getPackVoltage();
+  status.UCellCurrDelta = status.UCellCurrMax - status.UCellCurrMin;
+  
   status.TBattCurrMin = bms.getLowTemperature();
   status.TBattCurrMax = bms.getHighTemperature();
-  status.SOC = (float)map(uint16_t(status.UCellCurrAvg * 1000),
-                          uint16_t(settings.UCellSoc10 * 1000),
-                          uint16_t(settings.UCellSoc90 * 1000), 1000, 9000) * 0.01f;
-  status.SOH = 100.0f;
+
+  status.SocBattCurr = (float)map(uint16_t(status.UCellCurrAvg * 1000),
+                          uint16_t(settings.UCellNormMin * 1000),
+                          uint16_t(settings.UCellNormMax * 1000), 0, 10000) * 0.01f;
+  status.SohBattCurr = 100.0f;
+
   status.IBattCurr = 2.15f; // TODO
 }
 
@@ -200,7 +201,7 @@ void loop_bms()
     Logger::error("Alarm - internal failure");
   }
 
-  if (status.UCellCurrDiff > settings.UCellWarnBalanceDiff)
+  if (status.UCellCurrDelta > settings.UCellWarnBalanceDiff)
   {
     status.Error |= ERROR_CELLIMBALANCE;
     Logger::error("Alarm - cell imbalance");
@@ -244,12 +245,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x355;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(status.SOC));
-  msg.buf[1] = highByte(uint16_t(status.SOC));
-  msg.buf[2] = lowByte(uint16_t(status.SOH));
-  msg.buf[3] = highByte(uint16_t(status.SOH));
-  msg.buf[4] = lowByte(uint16_t(status.SOC * 100));
-  msg.buf[5] = highByte(uint16_t(status.SOC * 100));
+  msg.buf[0] = lowByte(uint16_t(status.SocBattCurr));
+  msg.buf[1] = highByte(uint16_t(status.SocBattCurr));
+  msg.buf[2] = lowByte(uint16_t(status.SohBattCurr));
+  msg.buf[3] = highByte(uint16_t(status.SohBattCurr));
+  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 100));
+  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 100));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);

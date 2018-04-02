@@ -89,20 +89,20 @@ typedef struct {
 
     float TBattNormMin;
     float TBattNormMax;
-
-    float UCellSoc10;
-    float UCellSoc90;
 } BMSSettings;
 
 typedef struct {
-    float UBattCurr          = 44.0f;
+    float UBattCurr          = 44.0f;     // all values in Norm-Range, prevents alarms/erros on startup
     
     float UCellCurrMin       = 3.6f;
     float UCellCurrAvg       = 3.6f;
     float UCellCurrMax       = 3.6f;
-    float UCellCurrDiff      = 0.0f;
+    float UCellCurrDelta      = 0.0f;
 
-    float IBattCurr          = 0.0f;
+    float SocBattCurr = 0.0f;             // calculated on UCellNorm 0-100%
+    float SohBattCurr = 100.0f;
+
+    float IBattCurr          = 0.0f;      // Charge < 0
     float IBattCurrCharge    = 0.0f;
     float IBattCurrDischarge = 0.0f;
 
@@ -111,9 +111,6 @@ typedef struct {
 
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
-    
-    float SOC = 0.0f;
-    float SOH = 100.0f;
 
     unsigned long Alarm = ERROR_NONE;
     unsigned long Error = ERROR_NONE;
