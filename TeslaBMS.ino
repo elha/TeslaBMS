@@ -59,22 +59,23 @@ void setup_settings()
   settings.UCellNormMax = 4.06f;
   settings.UCellWarnMax = 4.10f;
 
-  settings.UBattNormMin = settings.UCellNormMin * 12.0f; // 12s74p
-  settings.UBattNormMax = settings.UCellNormMax * 12.0f;
+  settings.UBattNormMin = settings.UCellNormMin * (float)settings.ConfigBattSerialCells; 
+  settings.UBattNormMax = settings.UCellNormMax * (float)settings.ConfigBattSerialCells;
 
   settings.UCellNormBalanceDiff = 0.03f;
   settings.UCellWarnBalanceDiff = 0.06f;
 
-  settings.IBattWarnChargeMax = 4.0f;
-  settings.IBattWarnDischargeMax = 4.0f;
-  settings.IBattOptiChargeMax = 1.5f;
-  settings.IBattOptiDischargeMax = 1.5f;
+  settings.IBattWarnChargeMax    = 25.0f;
+  settings.IBattWarnDischargeMax = 25.0f;
+  settings.IBattOptiChargeMax    = 23.0f;
+  settings.IBattOptiDischargeMax = 23.0f;
 
   settings.TBattNormMin = 10.0f;
   settings.TBattNormMax = 45.0f;
 
-  settings.QBattSpecMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
-  settings.QBattSpecMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
+  settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
+  settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
+  settings.QBattNorm    = settings.QBattNormMax - settings.QBattNormMin;
 
   settings.logLevel = Logger::Info;
 }
@@ -115,16 +116,12 @@ void loop_querybatt()
 
   // QBattNorm           = 100% original Capacity [Ah]
   // QBattCurr           = current Capacity [Ah]
+  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells - settings.QBattNormMin;
   
-  // SOC Calculation
-  //   CCM Method:      SOCBattCurr         = 1 - sum(IBattCurr · dt) / QBattCurr
+  //   OCV Method:      Mapping UCellCurrAvg to discharge curve
+  status.SocBattCurr = status.QBattCurr / settings.QBattNorm;
 
-  //   OCV Method:      Mapping UCellCurr (typical linear chart)
-  status.SocBattCurr = (float)map(uint16_t(status.UCellCurrAvg * 1000),
-                          uint16_t(settings.UCellNormMin * 1000),
-                          uint16_t(settings.UCellNormMax * 1000), 0, 10000) * 0.01f;
-
-  // SohBattCurr = QCurr / QNorm
+  // SohBattCurr = QBattCurr / QBattNorm
   status.SohBattCurr = 1.0f;
 }
 

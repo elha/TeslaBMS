@@ -125,8 +125,9 @@ typedef struct {
     float TBattNormMin;
     float TBattNormMax;
 
-    float QBattSpecMin;
-    float QBattSpecMax;    
+    float QBattNormMin;
+    float QBattNormMax;    
+    float QBattNorm;
 } BMSSettings;
 
 typedef struct {
