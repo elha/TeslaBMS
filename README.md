@@ -14,20 +14,13 @@ Implementing a bridge between two Tesla Model S battery modules (24V each, seria
 - Contactor activated by hobby servo on Error
 
 
-trying to collect voltages and corresponding SOC-values (no guarantee) 
-
-- Tesla modules:    18,0V,     18,6V,    23,1V,     24,6V,     24,9V
-- per Cell:         3,00V,     3,10V,    3,85V,     4,10V,     4,15V
-- SOC:                  0,        10,       70,        90,       100
-
-
 # Parameters
 
 - Curr  -> Measurements
 - Plan  -> Planned values
-- Opti  -> optimal Operating-Parameters 3,35V - 3,90V, 0,1C / 25A
-- Norm  -> Shutoff normal Operation     3,25V - 4,00V, 0,0C / 0A,  39,6V - 48V 
-- Warn  -> Warning CCGX                 3,15V - 4,10V   
+- Opti  -> optimal Operating-Parameters 3,30V - 4,00V, 0,1C / 25A
+- Norm  -> Shutoff normal Operation     3,25V - 4,06V, 0,0C / 0A
+- Warn  -> Warning CCGX                 3,20V - 4,10V   
 - Err   -> Alarm CCGX                   under - over 
 
 - naming convention on variables: 

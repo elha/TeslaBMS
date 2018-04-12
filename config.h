@@ -61,11 +61,46 @@
 #define ERROR_INTERNALFAILURE           0x00400000
 #define ERROR_CELLIMBALANCE             0x01000000
 
-
+static const uint8_t SizeCellSpecCurve0_2C = 30;
+//         V,        mAh
+static const float QCellSpecCurve0_2C[SizeCellSpecCurve0_2C][2] = { 
+        {  2.50f,      0.0f  },
+        {  2.60f,     15.0f  },
+        {  2.70f,     30.0f  },
+        {  2.80f,     52.0f  },
+        {  2.85f,     64.0f  },
+        {  2.90f,     80.0f  },
+        {  2.95f,    102.0f  },
+        {  3.00f,    121.0f  },
+        {  3.05f,    147.0f  },
+        {  3.10f,    180.0f  },
+        {  3.15f,    221.0f  },
+        {  3.20f,    278.0f  },
+        {  3.25f,    360.0f  }, // Norm min
+        {  3.30f,    459.0f  },
+        {  3.35f,    577.0f  },
+        {  3.40f,    736.0f  },
+        {  3.45f,    928.0f  },
+        {  3.50f,   1184.0f  },
+        {  3.55f,   1452.0f  },
+        {  3.60f,   1708.0f  },
+        {  3.70f,   2105.0f  },
+        {  3.80f,   2471.0f  },
+        {  3.90f,   2804.0f  },
+        {  4.00f,   3087.0f  },
+        {  4.02f,   3143.0f  },
+        {  4.06f,   3283.0f  }, // Norm max
+        {  4.08f,   3331.0f  },
+        {  4.10f,   3361.0f  },
+        {  4.12f,   3378.0f  },
+        {  4.20f,   3393.0f  }};
 
 typedef struct {
     uint8_t version;
     uint8_t logLevel;
+    
+    uint8_t ConfigBattParallelCells;
+    uint8_t ConfigBattSerialCells;
     
     float UBattNormMin;
     float UBattNormMax;
@@ -89,6 +124,9 @@ typedef struct {
 
     float TBattNormMin;
     float TBattNormMax;
+
+    float QBattSpecMin;
+    float QBattSpecMax;    
 } BMSSettings;
 
 typedef struct {
@@ -97,10 +135,7 @@ typedef struct {
     float UCellCurrMin       = 3.6f;
     float UCellCurrAvg       = 3.6f;
     float UCellCurrMax       = 3.6f;
-    float UCellCurrDelta      = 0.0f;
-
-    float SocBattCurr = 0.0f;             // calculated on UCellNorm 0-100%
-    float SohBattCurr = 100.0f;
+    float UCellCurrDelta     = 0.0f;
 
     float IBattCurr          = 0.0f;      // Charge < 0
     float IBattCurrCharge    = 0.0f;
@@ -109,9 +144,15 @@ typedef struct {
     float TBattCurrMin       = 30.0f;
     float TBattCurrMax       = 30.0f;
 
+    float QBattCurr;
+
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
+
+    float SohBattCurr = 1.000f;
+    float SocBattCurr = 1.000f;
 
     unsigned long Alarm = ERROR_NONE;
     unsigned long Error = ERROR_NONE;
 } BMSStatus;
+

@@ -48,12 +48,15 @@ void setup_settings()
   Logger::console("Loading defaults");
   settings.version = 1;
 
+  settings.ConfigBattParallelCells = 74;
+  settings.ConfigBattSerialCells   =  6;
+  
   settings.UCellWarnMin = 3.20f;
-  settings.UCellNormMin = 3.30f;
-  settings.UCellOptiMin = 3.40f;
+  settings.UCellNormMin = 3.25f;
+  settings.UCellOptiMin = 3.30f;
 
-  settings.UCellOptiMax = 3.90f;
-  settings.UCellNormMax = 4.00f;
+  settings.UCellOptiMax = 4.00f;
+  settings.UCellNormMax = 4.06f;
   settings.UCellWarnMax = 4.10f;
 
   settings.UBattNormMin = settings.UCellNormMin * 12.0f; // 12s74p
@@ -69,6 +72,9 @@ void setup_settings()
 
   settings.TBattNormMin = 10.0f;
   settings.TBattNormMax = 45.0f;
+
+  settings.QBattSpecMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
+  settings.QBattSpecMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
 
   settings.logLevel = Logger::Info;
 }
@@ -105,12 +111,21 @@ void loop_querybatt()
   status.TBattCurrMin = bms.getLowTemperature();
   status.TBattCurrMax = bms.getHighTemperature();
 
+  status.IBattCurr = 2.15f; // TODO
+
+  // QBattNorm           = 100% original Capacity [Ah]
+  // QBattCurr           = current Capacity [Ah]
+  
+  // SOC Calculation
+  //   CCM Method:      SOCBattCurr         = 1 - sum(IBattCurr · dt) / QBattCurr
+
+  //   OCV Method:      Mapping UCellCurr (typical linear chart)
   status.SocBattCurr = (float)map(uint16_t(status.UCellCurrAvg * 1000),
                           uint16_t(settings.UCellNormMin * 1000),
                           uint16_t(settings.UCellNormMax * 1000), 0, 10000) * 0.01f;
-  status.SohBattCurr = 100.0f;
 
-  status.IBattCurr = 2.15f; // TODO
+  // SohBattCurr = QCurr / QNorm
+  status.SohBattCurr = 1.0f;
 }
 
 void loop_bms()
@@ -245,12 +260,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x355;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(status.SocBattCurr));
-  msg.buf[1] = highByte(uint16_t(status.SocBattCurr));
-  msg.buf[2] = lowByte(uint16_t(status.SohBattCurr));
-  msg.buf[3] = highByte(uint16_t(status.SohBattCurr));
-  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 100));
-  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 100));
+  msg.buf[0] = lowByte(uint16_t(status.SocBattCurr * 100.0f));
+  msg.buf[1] = highByte(uint16_t(status.SocBattCurr * 100.0f));
+  msg.buf[2] = lowByte(uint16_t(status.SohBattCurr * 100.0f));
+  msg.buf[3] = highByte(uint16_t(status.SohBattCurr * 100.0f));
+  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 10000.0f));
+  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 10000.0f));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -324,4 +339,29 @@ void loop_readcan()
   // status.IBattCurr = CANmilliamps / 1000;
   // status.IBattCurrCharge = CANmilliamps / 1000;
   // status.IBattCurrDischarge = CANmilliamps / 1000;
+}
+
+// helper functions
+float getQCellSpec(float UCellCurr)
+{
+    for (int x = 1; x < SizeCellSpecCurve0_2C; x++)
+    {
+      double UCellSpecH = QCellSpecCurve0_2C[x  ][0];
+
+      if(UCellSpecH > UCellCurr)
+      {
+        double UCellSpecL = QCellSpecCurve0_2C[x-1][0];
+        double UCellSpecDiff = UCellSpecH - UCellSpecL;
+
+        double QCellSpecL = QCellSpecCurve0_2C[x-1][1];
+        double QCellSpecH = QCellSpecCurve0_2C[x  ][1];
+        double QCellSpecDiff = QCellSpecH - QCellSpecL;
+        
+        double UCellCurrDiff = UCellCurr  - UCellSpecL;
+
+        // linear interpolation
+        return (UCellCurrDiff / UCellSpecDiff) * QCellSpecDiff;        
+      }
+    }
+    return 100.0f;
 }
