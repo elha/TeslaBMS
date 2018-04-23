@@ -8,6 +8,13 @@ BMSSettings settings;
 BMSStatus status;
 BMSModuleManager bms;
 
+#include <ADC.h>
+#include <DMAChannel.h>
+#include <array>
+ADC adc;
+DMAChannel dma;
+std::array<volatile uint16_t, 4096> buffer;
+
 void setup()
 {
   setup_settings();
@@ -15,21 +22,19 @@ void setup()
 
   delay(4000);
 
+  setup_adc();
   setup_bms();
-
-  delay(4000);
 }
 
 void loop()
 {
   loop_readcan();
 
-  static unsigned long looptime;
-  if (millis() - looptime > 500)
+  static unsigned long loop1;  
+  if( checkinterval(loop1, 500) )
   {
-    looptime = millis();
-
     // input
+    loop_querycurrent();
     loop_querybatt();
 
     // logic
@@ -37,19 +42,27 @@ void loop()
 
     // output
     loop_vecan();
-    loop_debug();
+  }
+
+  static unsigned long loop2;  
+  if( checkinterval(loop2, 10000) )
+  {
+    // calc
+    loop_calc();
+
+    // console output
+    loop_console();
   }
 }
 
 // setup ###############
-
 void setup_settings()
 {
   Logger::console("Loading defaults");
   settings.version = 1;
 
   settings.ConfigBattParallelCells = 74;
-  settings.ConfigBattSerialCells   =  6;
+  settings.ConfigBattSerialCells   = 12;
   
   settings.UCellWarnMin = 3.20f;
   settings.UCellNormMin = 3.25f;
@@ -76,7 +89,11 @@ void setup_settings()
   settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
   settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
   settings.QBattNorm    = settings.QBattNormMax - settings.QBattNormMin;
+  settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
+  settings.ConstInCurrentOffset = 2.125f - 0.47f - 0.129f;
+  settings.ConstInCurrentSampleFreq = 256;
+  
   settings.logLevel = Logger::Info;
 }
 
@@ -97,7 +114,76 @@ void setup_bms()
   bms.clearFaults();
 }
 
+void setup_adc()
+{
+  pinMode(INCURRENT, INPUT);
+  
+  adc.setResolution(14);
+  adc.setConversionSpeed(ADC_CONVERSION_SPEED::LOW_SPEED);
+  adc.setSamplingSpeed(ADC_SAMPLING_SPEED::LOW_SPEED);
+  adc.adc0->analogRead(INCURRENT); // performs various ADC setup stuff
+
+  dma.source(ADC0_RA); // ADC result register
+  dma.transferSize(2);
+  dma.triggerAtHardwareEvent(DMAMUX_SOURCE_ADC0);
+  dma.destinationBuffer(buffer.data(), buffer.size() * sizeof(buffer[0]));
+  dma.enable();
+
+  adc.enableDMA(ADC_0);
+  
+  adc.adc0->stopPDB();
+  adc.adc0->startPDB(settings.ConstInCurrentSampleFreq); 
+  NVIC_DISABLE_IRQ(IRQ_PDB); // we don't want or need the PDB interrupt
+}
+
+void pdb_isr(void) {
+  PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt, called once, bad combination with ADC-library
+}
+
 // loop ###############
+void loop_querycurrent()
+{
+  if(adc.adc0->fail_flag) {
+    Logger::error("ADC FAIL %l", adc.adc0->fail_flag);
+  }
+
+  static size_t lastidx = 0;
+  size_t idx = ((uint16_t*) dma.destinationAddress()) - buffer.data();
+
+  if(idx<lastidx) idx += buffer.size();
+  
+  if((idx - lastidx) < settings.ConstInCurrentSampleFreq)
+  {
+    return;
+  }
+
+  // average last second
+  double value = 0;
+  for(uint16_t i = 0; i < settings.ConstInCurrentSampleFreq; i++) {
+    value += (double)buffer[lastidx++];
+    if(lastidx==buffer.size()) lastidx = 0;
+  }
+  
+  static const double maxvalue = pow(2,16)-1;
+  value /= (double)settings.ConstInCurrentSampleFreq;
+  value -= maxvalue * 0.5;
+  
+  // ACS758xCB 50A bidirectional, 50% = 0A, 40mV/A @ 5V = 40/5000 = 1/125
+  status.IBattCurr = (value / maxvalue) * 125.0l + (double)settings.ConstInCurrentOffset;
+  
+  if(status.IBattCurr >= 0)
+  {
+    status.IBattCurrCharge    =  0.0f;
+    status.IBattCurrDischarge = +status.IBattCurr;
+  }
+  else
+  {
+    status.IBattCurrCharge    = -status.IBattCurr;
+    status.IBattCurrDischarge = 0.0f;
+  }
+
+  status.QBattMeasuredKwh += status.IBattCurr / (double)3600.0 /(double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
+}
 
 void loop_querybatt()
 {
@@ -110,19 +196,7 @@ void loop_querybatt()
   status.UCellCurrDelta = status.UCellCurrMax - status.UCellCurrMin;
   
   status.TBattCurrMin = bms.getLowTemperature();
-  status.TBattCurrMax = bms.getHighTemperature();
-
-  status.IBattCurr = 2.15f; // TODO
-
-  // QBattNorm           = 100% original Capacity [Ah]
-  // QBattCurr           = current Capacity [Ah]
-  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells - settings.QBattNormMin;
-  
-  //   OCV Method:      Mapping UCellCurrAvg to discharge curve
-  status.SocBattCurr = status.QBattCurr / settings.QBattNorm;
-
-  // SohBattCurr = QBattCurr / QBattNorm
-  status.SohBattCurr = 1.0f;
+  status.TBattCurrMax = bms.getHighTemperature(); 
 }
 
 void loop_bms()
@@ -227,10 +301,31 @@ void loop_bms()
   }
 }
 
-void loop_debug()
+void loop_calc()
 {
-  if (settings.logLevel > Logger::Info)
-    return;
+  // QBattNorm           = 100% Capacity within Norm-range [Ah]
+  // QBattCurr           = current Capacity [Ah]
+  // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
+  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells - settings.QBattNormMin;  
+  status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
+
+  status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
+
+  // SohBattCurr = QBattCurr / QBattNorm
+  status.SohBattCurr = 1.0f;
+}
+
+void loop_console()
+{
+  Logger::info("Qm=%fkWh Q=%fAh/%fAh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV UCellDelta=%fV T=%fC", 
+                        status.QBattMeasuredKwh,
+                        status.QBattCurr, settings.QBattNorm,
+                        status.QBattCurrKwh, settings.QBattNormKwh, 
+                        status.SocBattCurr * 100.0, status.SohBattCurr * 100.0,
+                        status.IBattCurr, status.UBattCurr, status.UCellCurrAvg, status.UCellCurrDelta,
+                        status.TBattCurrMax );
+
+  if (settings.logLevel > Logger::Debug) return;
 
   bms.printPackDetails();
 }
@@ -332,10 +427,6 @@ void loop_readcan()
   CAN_message_t msgin;
   if (!CANVE.available())
     CANVE.read(msgin);
-
-  // status.IBattCurr = CANmilliamps / 1000;
-  // status.IBattCurrCharge = CANmilliamps / 1000;
-  // status.IBattCurrDischarge = CANmilliamps / 1000;
 }
 
 // helper functions
@@ -357,8 +448,34 @@ float getQCellSpec(float UCellCurr)
         double UCellCurrDiff = UCellCurr  - UCellSpecL;
 
         // linear interpolation
-        return (UCellCurrDiff / UCellSpecDiff) * QCellSpecDiff;        
+        return (QCellSpecL + (UCellCurrDiff / UCellSpecDiff * QCellSpecDiff)) * 0.001l;        
       }
     }
     return 100.0f;
+}
+
+float getQBattNorm(float UCellCurr)
+{
+    static const double step = 0.002f;
+    double out = 0.0l;
+    double last = getQCellSpec(settings.UCellNormMin);
+    for (float x = settings.UCellNormMin; x <= UCellCurr; x+=step)
+    {
+      float QCurr = getQCellSpec(x);
+      out += x * (QCurr - last);
+      last = QCurr;
+    }
+    return out * 0.001l * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells;
+}
+
+byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interval) {
+  if(millis() - loop_PreviousMillis > loop_Interval)
+  {
+    loop_PreviousMillis = millis();
+    return -1;
+  }
+  else    
+  {
+    return 0;
+  }
 }

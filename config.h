@@ -24,6 +24,8 @@
 // Victron Bus
 #define CANVE Can0 
 
+// Currentsensor
+#define INCURRENT A14
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1
@@ -128,6 +130,10 @@ typedef struct {
     float QBattNormMin;
     float QBattNormMax;    
     float QBattNorm;
+    float QBattNormKwh;
+
+    float ConstInCurrentOffset;
+    uint16_t ConstInCurrentSampleFreq;
 } BMSSettings;
 
 typedef struct {
@@ -146,7 +152,9 @@ typedef struct {
     float TBattCurrMax       = 30.0f;
 
     float QBattCurr;
-
+    float QBattCurrKwh;
+    float QBattMeasuredKwh;
+    
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
 
