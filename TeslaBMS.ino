@@ -50,8 +50,18 @@ void loop()
     // calc
     loop_calc();
 
+    // contactor
+    loop_contactor();
+
     // console output
     loop_console();
+  }
+
+  static unsigned long loop3;  
+  if( checkinterval(loop3, 3600000) )
+  {
+    // clear com errors
+    loop_comerror();
   }
 }
 
@@ -78,20 +88,20 @@ void setup_settings()
   settings.UCellNormBalanceDiff = 0.03f;
   settings.UCellWarnBalanceDiff = 0.06f;
 
-  settings.IBattWarnChargeMax    = 25.0f;
-  settings.IBattWarnDischargeMax = 25.0f;
-  settings.IBattOptiChargeMax    = 23.0f;
-  settings.IBattOptiDischargeMax = 23.0f;
+  settings.IBattWarnChargeMax    = 35.0f;
+  settings.IBattWarnDischargeMax = 35.0f;
+  settings.IBattOptiChargeMax    = 30.0f;
+  settings.IBattOptiDischargeMax = 30.0f;
 
-  settings.TBattNormMin = 10.0f;
-  settings.TBattNormMax = 45.0f;
+  settings.TBattNormMin = 15.0f;
+  settings.TBattNormMax = 32.0f;
 
   settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
   settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
   settings.QBattNorm    = settings.QBattNormMax - settings.QBattNormMin;
   settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
-  settings.ConstInCurrentOffset = 2.125f - 0.47f - 0.129f;
+  settings.ConstInCurrentOffset = 0.0f; // will be set on first measurement
   settings.ConstInCurrentSampleFreq = 256;
   
   settings.logLevel = Logger::Info;
@@ -109,6 +119,11 @@ void setup_bus()
 
 void setup_bms()
 {
+  pinMode(PRELOAD, OUTPUT);
+  digitalWrite(PRELOAD, LOW);
+  pinMode(CONTACTOR, OUTPUT);
+  digitalWrite(CONTACTOR, LOW);  
+  
   bms.renumberBoardIDs();
   bms.findBoards();
   bms.clearFaults();
@@ -170,6 +185,7 @@ void loop_querycurrent()
   
   // ACS758xCB 50A bidirectional, 50% = 0A, 40mV/A @ 5V = 40/5000 = 1/125
   status.IBattCurr = (value / maxvalue) * 125.0l + (double)settings.ConstInCurrentOffset;
+  if(settings.ConstInCurrentOffset == 0) settings.ConstInCurrentOffset = -(double)status.IBattCurr;
   
   if(status.IBattCurr >= 0)
   {
@@ -293,11 +309,52 @@ void loop_bms()
     Logger::error("Alarm - cell imbalance");
   }
 
+  if (bms.getCommunicationErrors() > status.CBmsWarnErrors)
+  {
+    status.Error |= ERROR_INTERNALFAILURE;
+    Logger::error("Alarm - bms communication errors");    
+  }
+
   // shut off charging/discharging on Warning or Error
   if (status.Error != 0 || status.Alarm != 0)
   {
     status.IBattPlanChargeMax = 0;
     status.IBattPlanDischargeMax = 0;
+  }
+}
+
+void loop_contactor()
+{
+  
+  if (status.State > 0 && status.Error != 0) 
+  {
+    digitalWrite(PRELOAD, LOW);
+    digitalWrite(CONTACTOR, LOW);  
+    status.State = 0;
+    Logger::error("Contactor - disconnect on alarm");  
+  } 
+  else if (status.State == 0 && status.Error == 0 && status.Alarm == 0) //  start preloading soon if normal state
+  {
+    status.State = 1;
+    Logger::info("Contactor - preload starts soon");  
+  }
+  else if (status.State == 1 && status.Error == 0 && status.Alarm == 0) //  start preloading if normal state
+  {
+    digitalWrite(PRELOAD, HIGH);
+    status.State = 2;
+    Logger::info("Contactor - preload");  
+  }
+  else if (status.State == 2 && abs(status.IBattCurr) < 0.30)  // close Contactor when current is minimal
+  {    
+    digitalWrite(CONTACTOR, HIGH);
+    status.State = 3;
+    Logger::info("Contactor - closed");  
+  }
+  else if (status.State == 3)  // open preload
+  {    
+    digitalWrite(PRELOAD, LOW);
+    status.State = 4;
+    Logger::info("Contactor - closed, preload released");  
   }
 }
 
@@ -321,7 +378,7 @@ void loop_console()
                         status.QBattMeasuredKwh,
                         status.QBattCurr, settings.QBattNorm,
                         status.QBattCurrKwh, settings.QBattNormKwh, 
-                        status.SocBattCurr * 100.0, status.SohBattCurr * 100.0,
+                        status.SocBattCurr * 100.0f, status.SohBattCurr * 100.0f,
                         status.IBattCurr, status.UBattCurr, status.UCellCurrAvg, status.UCellCurrDelta,
                         status.TBattCurrMax );
 
@@ -338,14 +395,14 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x351;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10));
-  msg.buf[1] = highByte(uint16_t(settings.UBattNormMax * 10));
-  msg.buf[2] = lowByte(uint16_t(status.IBattPlanChargeMax * 10));
-  msg.buf[3] = highByte(uint16_t(status.IBattPlanChargeMax * 10));
-  msg.buf[4] = lowByte(uint16_t(status.IBattPlanDischargeMax * 10));
-  msg.buf[5] = highByte(uint16_t(status.IBattPlanDischargeMax * 10));
-  msg.buf[6] = lowByte(uint16_t(settings.UBattNormMin * 10));
-  msg.buf[7] = highByte(uint16_t(settings.UBattNormMin * 10));
+  msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10.0f));
+  msg.buf[1] = highByte(uint16_t(settings.UBattNormMax * 10.0f));
+  msg.buf[2] = lowByte(uint16_t(status.IBattPlanChargeMax * 10.0f));
+  msg.buf[3] = highByte(uint16_t(status.IBattPlanChargeMax * 10.0f));
+  msg.buf[4] = lowByte(uint16_t(status.IBattPlanDischargeMax * 10.0f));
+  msg.buf[5] = highByte(uint16_t(status.IBattPlanDischargeMax * 10.0f));
+  msg.buf[6] = lowByte(uint16_t(settings.UBattNormMin * 10.0f));
+  msg.buf[7] = highByte(uint16_t(settings.UBattNormMin * 10.0f));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
@@ -356,8 +413,8 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[1] = highByte(uint16_t(status.SocBattCurr * 100.0f));
   msg.buf[2] = lowByte(uint16_t(status.SohBattCurr * 100.0f));
   msg.buf[3] = highByte(uint16_t(status.SohBattCurr * 100.0f));
-  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 10000.0f));
-  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 10000.0f));
+  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 1000.0f));
+  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 1000.0f));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -366,14 +423,14 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x356;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(status.UBattCurr * 100));
-  msg.buf[1] = highByte(uint16_t(status.UBattCurr * 100));
-  msg.buf[2] = lowByte(uint16_t(status.IBattCurr * 10));
-  msg.buf[3] = highByte(uint16_t(status.IBattCurr * 10));
-  msg.buf[4] = lowByte(uint16_t(status.TBattCurrMax * 10));
-  msg.buf[5] = highByte(uint16_t(status.TBattCurrMax * 10));
-  msg.buf[6] = 0;
+  msg.buf[0] = lowByte(uint16_t(status.UBattCurr * 100.0f));
+  msg.buf[1] = highByte(uint16_t(status.UBattCurr * 100.0f));
+  msg.buf[2] = lowByte(int16_t(status.IBattCurr * -10.0f));
+  msg.buf[3] = highByte(int16_t(status.IBattCurr * -10.0f));
+  msg.buf[4] = lowByte(uint16_t(status.TBattCurrMax * 10.0f));
+  msg.buf[5] = highByte(uint16_t(status.TBattCurrMax * 10.0f));
   msg.buf[7] = 0;
+  msg.buf[8] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
@@ -395,14 +452,14 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x35E;
   msg.len = 8;
-  msg.buf[0] = 'S';
-  msg.buf[1] = 'I';
-  msg.buf[2] = 'M';
-  msg.buf[3] = 'P';
-  msg.buf[4] = ' ';
+  msg.buf[0] = 'T';
+  msg.buf[1] = 'e';
+  msg.buf[2] = 's';
+  msg.buf[3] = 'l';
+  msg.buf[4] = 'a';
   msg.buf[5] = 'B';
-  msg.buf[6] = 'M';
-  msg.buf[7] = 'S';
+  msg.buf[6] = 'm';
+  msg.buf[7] = 's';
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
@@ -425,8 +482,16 @@ void loop_vecan() // communication with Victron system over CAN
 void loop_readcan()
 {
   CAN_message_t msgin;
-  if (!CANVE.available())
+  if (CANVE.available())
+  {
     CANVE.read(msgin);
+    Logger::debug("VECan read %i %i", msgin.id, msgin.buf[0]);
+  }
+}
+
+void loop_comerror()
+{
+  bms.resetCommunicationErrors();
 }
 
 // helper functions
@@ -468,7 +533,8 @@ float getQBattNorm(float UCellCurr)
     return out * 0.001l * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells;
 }
 
-byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interval) {
+byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interval) 
+{
   if(millis() - loop_PreviousMillis > loop_Interval)
   {
     loop_PreviousMillis = millis();

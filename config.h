@@ -18,14 +18,17 @@
 #define SERIALCONSOLE Serial
 
 // Tesla BMS Modules
-#define SERIALBMS Serial3 
+#define SERIALBMS Serial3 // TX 8, RX 7
 #define INBMBFAULT 11
 
 // Victron Bus
-#define CANVE Can0 
+#define CANVE Can0        // TX 3, RX 4
 
 // Currentsensor
 #define INCURRENT A14
+
+#define PRELOAD   24
+#define CONTACTOR 25
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1
@@ -160,6 +163,10 @@ typedef struct {
 
     float SohBattCurr = 1.000f;
     float SocBattCurr = 1.000f;
+
+    long CBmsWarnErrors = 2;   // if more then x communication errors on bms serial bus then report error
+
+    byte State = 0; // 0 disconnect, 1 preload, 2 connect, 3 release preload
 
     unsigned long Alarm = ERROR_NONE;
     unsigned long Error = ERROR_NONE;
