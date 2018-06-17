@@ -179,6 +179,7 @@ void BMSModuleManager::clearFaults()
     BMSUtil::sendDataWithReply(payload, 3, true, buff, 4);
 
     isFaulted = false;
+    communicationErrors = 0;
 }
 
 /*
@@ -432,18 +433,22 @@ void BMSModuleManager::printPackSummary()
                 if (faults & 4)
                 {
                     Logger::console("    CRC error in received packet");
+                    communicationErrors += 1;
                 }
                 if (faults & 8)
                 {
                     Logger::console("    Power on reset has occurred");
+                    communicationErrors += 1;
                 }
                 if (faults & 0x10)
                 {
                     Logger::console("    Test fault active");
+                    communicationErrors += 1;
                 }
                 if (faults & 0x20)
                 {
                     Logger::console("    Internal registers inconsistent");
+                    communicationErrors += 1;
                 }
             }
             if (alerts > 0)
@@ -452,10 +457,12 @@ void BMSModuleManager::printPackSummary()
                 if (alerts & 1)
                 {
                     Logger::console("    Over temperature on TS1");
+                    communicationErrors += 1;
                 }
                 if (alerts & 2)
                 {
                     Logger::console("    Over temperature on TS2");
+                    communicationErrors += 1;
                 }
                 if (alerts & 4)
                 {
@@ -472,14 +479,17 @@ void BMSModuleManager::printPackSummary()
                 if (alerts & 0x20)
                 {
                     Logger::console("    OTP EPROM Uncorrectable Error");
+                    communicationErrors += 1;
                 }
                 if (alerts & 0x40)
                 {
                     Logger::console("    GROUP3 Regs Invalid");
+                    communicationErrors += 1;
                 }
                 if (alerts & 0x80)
                 {
                     Logger::console("    Address not registered");
+                    communicationErrors += 1;
                 }
             }
             if (faults > 0 || alerts > 0)
@@ -540,4 +550,14 @@ void BMSModuleManager::printPackDetails()
             SERIALCONSOLE.println("C");
         }
     }
+}
+
+long BMSModuleManager::getCommunicationErrors()
+{
+    return communicationErrors;
+}
+
+void BMSModuleManager::resetCommunicationErrors()
+{
+    communicationErrors = 0;
 }
