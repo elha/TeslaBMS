@@ -88,10 +88,10 @@ void setup_settings()
   settings.UCellNormBalanceDiff = 0.03f;
   settings.UCellWarnBalanceDiff = 0.06f;
 
-  settings.IBattWarnChargeMax    = 35.0f;
-  settings.IBattWarnDischargeMax = 35.0f;
-  settings.IBattOptiChargeMax    = 30.0f;
-  settings.IBattOptiDischargeMax = 30.0f;
+  settings.IBattWarnChargeMax    = 31.0f;
+  settings.IBattWarnDischargeMax = 31.0f;
+  settings.IBattOptiChargeMax    = 28.0f;
+  settings.IBattOptiDischargeMax = 28.0f;
 
   settings.TBattNormMin = 15.0f;
   settings.TBattNormMax = 32.0f;
@@ -367,7 +367,9 @@ void loop_calc()
   status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
 
   status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
-
+  if(status.SocBattCurr < 0.0f) status.SocBattCurr = 0.0f;
+  if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
+  
   // SohBattCurr = QBattCurr / QBattNorm
   status.SohBattCurr = 1.0f;
 }
@@ -413,8 +415,8 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[1] = highByte(uint16_t(status.SocBattCurr * 100.0f));
   msg.buf[2] = lowByte(uint16_t(status.SohBattCurr * 100.0f));
   msg.buf[3] = highByte(uint16_t(status.SohBattCurr * 100.0f));
-  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 1000.0f));
-  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 1000.0f));
+  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 10000.0f));
+  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 10000.0f));
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -423,12 +425,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x356;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(status.UBattCurr * 100.0f));
-  msg.buf[1] = highByte(uint16_t(status.UBattCurr * 100.0f));
+  msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0f));
+  msg.buf[1] = highByte(int16_t(status.UBattCurr * 100.0f));
   msg.buf[2] = lowByte(int16_t(status.IBattCurr * -10.0f));
   msg.buf[3] = highByte(int16_t(status.IBattCurr * -10.0f));
-  msg.buf[4] = lowByte(uint16_t(status.TBattCurrMax * 10.0f));
-  msg.buf[5] = highByte(uint16_t(status.TBattCurrMax * 10.0f));
+  msg.buf[4] = lowByte(int16_t(status.TBattCurrMax * 10.0f));
+  msg.buf[5] = highByte(int16_t(status.TBattCurrMax * 10.0f));
   msg.buf[7] = 0;
   msg.buf[8] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
