@@ -157,6 +157,7 @@ typedef struct {
     float QBattCurr;
     float QBattCurrKwh;
     float QBattMeasuredKwh;
+    float QBattStartCycle;
     
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
@@ -165,8 +166,8 @@ typedef struct {
     float SocBattCurr = 1.000f;
 
     long CBmsWarnErrors = 2;   // if more then x communication errors on bms serial bus then report error
-
-    byte State = 0; // 0 disconnect, 1 preload, 2 connect, 3 release preload
+    
+    byte State = 0; // 0 disconnect, 1 preload, 2 connect, 3 release preload, 4 charge, 5 discharge
 
     unsigned long Alarm = ERROR_NONE;
     unsigned long Error = ERROR_NONE;

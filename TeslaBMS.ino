@@ -40,6 +40,8 @@ void loop()
     // logic
     loop_bms();
 
+    loop_console();
+
     // output
     loop_vecan();
   }
@@ -127,6 +129,8 @@ void setup_bms()
   bms.renumberBoardIDs();
   bms.findBoards();
   bms.clearFaults();
+
+  status.SohBattCurr = 1.0f;
 }
 
 void setup_adc()
@@ -356,6 +360,21 @@ void loop_contactor()
     status.State = 4;
     Logger::info("Contactor - closed, preload released");  
   }
+  else if ((status.State == 4 || status.State == 5) && status.IBattCurr > 0.0f)  // charging -> discharging
+  {    
+    status.State = 6;
+    status.QBattStartCycle = status.QBattCurrKwh;
+    status.QBattMeasuredKwh = 0.0f;
+    Logger::info("Contactor - discharging");  
+  }
+  else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0f)  // discharging -> charging
+  {    
+    status.State = 5;
+    status.QBattStartCycle = status.QBattCurrKwh;
+    status.QBattMeasuredKwh = 0.0f;
+    Logger::info("Contactor - charging");  
+  }
+
 }
 
 void loop_calc()
@@ -371,7 +390,8 @@ void loop_calc()
   if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
   
   // SohBattCurr = QBattCurr / QBattNorm
-  status.SohBattCurr = 1.0f;
+  if(abs(status.QBattMeasuredKwh)>0.2f && abs(status.QBattStartCycle - status.QBattCurrKwh)>0.2f)
+    status.SohBattCurr = abs(status.QBattMeasuredKwh) / abs(status.QBattStartCycle - status.QBattCurrKwh);  
 }
 
 void loop_console()
