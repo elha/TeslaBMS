@@ -202,7 +202,7 @@ void loop_querycurrent()
     status.IBattCurrDischarge = 0.0f;
   }
 
-  status.QBattMeasuredKwh += status.IBattCurr / (double)3600.0 /(double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
+  status.QBattCycleMeasuredKwh += status.IBattCurr / (double)3600.0 /(double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
 }
 
 void loop_querybatt()
@@ -363,15 +363,15 @@ void loop_contactor()
   else if ((status.State == 4 || status.State == 5) && status.IBattCurr > 0.0f)  // charging -> discharging
   {    
     status.State = 6;
-    status.QBattStartCycle = status.QBattCurrKwh;
-    status.QBattMeasuredKwh = 0.0f;
+    status.QBattCycleStartKwh = status.QBattCurrKwh;
+    status.QBattCycleMeasuredKwh = 0.0f;
     Logger::info("Contactor - discharging");  
   }
   else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0f)  // discharging -> charging
   {    
     status.State = 5;
-    status.QBattStartCycle = status.QBattCurrKwh;
-    status.QBattMeasuredKwh = 0.0f;
+    status.QBattCycleStartKwh = status.QBattCurrKwh;
+    status.QBattCycleMeasuredKwh = 0.0f;
     Logger::info("Contactor - charging");  
   }
 
@@ -390,14 +390,14 @@ void loop_calc()
   if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
   
   // SohBattCurr = QBattCurr / QBattNorm
-  if(abs(status.QBattMeasuredKwh)>0.2f && abs(status.QBattStartCycle - status.QBattCurrKwh)>0.2f)
-    status.SohBattCurr = abs(status.QBattMeasuredKwh) / abs(status.QBattStartCycle - status.QBattCurrKwh);  
+  if(abs(status.QBattCycleMeasuredKwh)>0.2f && abs(status.QBattCycleStartKwh - status.QBattCurrKwh)>0.2f)
+    status.SohBattCurr = abs(status.QBattCycleMeasuredKwh) / abs(status.QBattCycleStartKwh - status.QBattCurrKwh);  
 }
 
 void loop_console()
 {
   Logger::info("Qm=%fkWh Q=%fAh/%fAh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV UCellDelta=%fV T=%fC", 
-                        status.QBattMeasuredKwh,
+                        status.QBattCycleMeasuredKwh,
                         status.QBattCurr, settings.QBattNorm,
                         status.QBattCurrKwh, settings.QBattNormKwh, 
                         status.SocBattCurr * 100.0f, status.SohBattCurr * 100.0f,
