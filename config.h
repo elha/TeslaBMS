@@ -156,8 +156,8 @@ typedef struct {
 
     float QBattCurr;
     float QBattCurrKwh;
-    float QBattMeasuredKwh;
-    float QBattStartCycle;
+    float QCycleMeasuredKwh;
+    float QCycleStartKwh;
     
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
