@@ -125,6 +125,7 @@ typedef struct {
     float IBattWarnDischargeMax;
 
     float IBattOptiChargeMax;
+    float IBattOptiChargeMin;
     float IBattOptiDischargeMax;
 
     float TBattNormMin;

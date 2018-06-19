@@ -40,8 +40,6 @@ void loop()
     // logic
     loop_bms();
 
-    loop_console();
-
     // output
     loop_vecan();
   }
@@ -93,6 +91,7 @@ void setup_settings()
   settings.IBattWarnChargeMax    = 31.0f;
   settings.IBattWarnDischargeMax = 31.0f;
   settings.IBattOptiChargeMax    = 28.0f;
+  settings.IBattOptiChargeMin    = 1.5f;
   settings.IBattOptiDischargeMax = 28.0f;
 
   settings.TBattNormMin = 15.0f;
@@ -241,6 +240,7 @@ void loop_bms()
         Logger::info("Balancing Pack");
 
     status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);
+    if (status.IBattPlanChargeMax < settings.IBattOptiChargeMin) status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge 2A
   }
   else if (status.UCellCurrMax < settings.UCellWarnMax)
   {
@@ -431,12 +431,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x355;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(status.SocBattCurr * 100.0f));
-  msg.buf[1] = highByte(uint16_t(status.SocBattCurr * 100.0f));
-  msg.buf[2] = lowByte(uint16_t(status.SohBattCurr * 100.0f));
-  msg.buf[3] = highByte(uint16_t(status.SohBattCurr * 100.0f));
-  msg.buf[4] = lowByte(uint16_t(status.SocBattCurr * 10000.0f));
-  msg.buf[5] = highByte(uint16_t(status.SocBattCurr * 10000.0f));
+  msg.buf[0] = (byte)(status.SocBattCurr * 100.0f);
+  msg.buf[1] = 0;
+  msg.buf[2] = (byte)(status.SohBattCurr * 100.0f);
+  msg.buf[3] = 0;
+  msg.buf[4] = 0; //should be 0.01% SOC but does not work for me
+  msg.buf[5] = 0;
   msg.buf[6] = 0;
   msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
