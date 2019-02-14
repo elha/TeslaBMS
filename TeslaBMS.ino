@@ -17,6 +17,7 @@ std::array<volatile uint16_t, 4096> buffer;
 
 void setup()
 {
+  setup_led();
   setup_settings();
   setup_bus();
 
@@ -33,6 +34,9 @@ void loop()
   static unsigned long loop1;  
   if( checkinterval(loop1, 500) )
   {
+    // status LED
+    loop_led();
+    
     // input
     loop_querycurrent();
     loop_querybatt();
@@ -74,7 +78,7 @@ void setup_settings()
   settings.ConfigBattParallelCells = 74;
   settings.ConfigBattSerialCells   = 12;
   
-  settings.UCellWarnMin = 3.20f;
+  settings.UCellWarnMin = 3.10f;
   settings.UCellNormMin = 3.25f;
   settings.UCellOptiMin = 3.30f;
 
@@ -88,11 +92,11 @@ void setup_settings()
   settings.UCellNormBalanceDiff = 0.03f;
   settings.UCellWarnBalanceDiff = 0.06f;
 
-  settings.IBattWarnChargeMax    = 31.0f;
-  settings.IBattWarnDischargeMax = 31.0f;
-  settings.IBattOptiChargeMax    = 28.0f;
-  settings.IBattOptiChargeMin    = 1.5f;
-  settings.IBattOptiDischargeMax = 28.0f;
+  settings.IBattWarnChargeMax    = 80.0f;
+  settings.IBattWarnDischargeMax = 80.0f;
+  settings.IBattOptiChargeMax    = 70.0f;
+  settings.IBattOptiChargeMin    =  4.00f;
+  settings.IBattOptiDischargeMax = 70.0f;
 
   settings.TBattNormMin = 15.0f;
   settings.TBattNormMax = 32.0f;
@@ -154,16 +158,27 @@ void setup_adc()
   NVIC_DISABLE_IRQ(IRQ_PDB); // we don't want or need the PDB interrupt
 }
 
+void setup_led()
+{
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
+}
+
 void pdb_isr(void) {
   PDB0_SC &=~PDB_SC_PDBIF; // clear interrupt, called once, bad combination with ADC-library
 }
 
 // loop ###############
+void loop_led()
+{
+  digitalWrite(LED, ! digitalRead(LED));
+}
+
 void loop_querycurrent()
 {
-  if(adc.adc0->fail_flag) {
-    Logger::error("ADC FAIL %l", adc.adc0->fail_flag);
-  }
+  //if(adc.adc0->fail_flag) {
+  //  Logger::error("ADC FAIL %l", adc.adc0->fail_flag);
+  //}
 
   static size_t lastidx = 0;
   size_t idx = ((uint16_t*) dma.destinationAddress()) - buffer.data();
@@ -239,8 +254,7 @@ void loop_bms()
       if (bms.balanceCells(settings.UCellNormBalanceDiff))
         Logger::info("Balancing Pack");
 
-    status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);
-    if (status.IBattPlanChargeMax < settings.IBattOptiChargeMin) status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge 2A
+    status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge 
   }
   else if (status.UCellCurrMax < settings.UCellWarnMax)
   {

@@ -370,7 +370,7 @@ float BMSModuleManager::getAvgCellVolt()
     return avg;
 }
 
-void BMSModuleManager::printPackSummary()
+void BMSModuleManager::printPackDetails()
 {
     uint8_t faults;
     uint8_t alerts;
@@ -381,13 +381,17 @@ void BMSModuleManager::printPackSummary()
     Logger::console("");
     Logger::console("");
     Logger::console("                                     Pack Status:");
+
     if (isFaulted)
         Logger::console("                                       FAULTED!");
     else
         Logger::console("                                   All systems go!");
+    
     Logger::console("Modules: %i    Voltage: %fV   Avg Cell Voltage: %fV     Avg Temp: %fC ", numFoundModules,
-                    getPackVoltage(), getAvgCellVolt(), getAvgTemperature());
+                     getPackVoltage(), getAvgCellVolt(), getAvgTemperature());
+
     Logger::console("");
+
     for (int y = 1; y < 63; y++)
     {
         if (modules[y].isExisting())
@@ -397,38 +401,33 @@ void BMSModuleManager::printPackSummary()
             COV = modules[y].getCOVCells();
             CUV = modules[y].getCUVCells();
 
-            Logger::console("                               Module #%i", y);
+            Logger::console("Module #%i", y);
 
             Logger::console("  Voltage: %fV   (%fV-%fV)     Temperatures: (%fC-%fC)", modules[y].getModuleVoltage(),
                             modules[y].getLowCellV(), modules[y].getHighCellV(), modules[y].getLowTemp(), modules[y].getHighTemp());
+
             if (faults > 0)
             {
                 Logger::console("  MODULE IS FAULTED:");
                 if (faults & 1)
                 {
-                    SERIALCONSOLE.print("    Overvoltage Cell Numbers (1-6): ");
                     for (int i = 0; i < 6; i++)
                     {
                         if (COV & (1 << i))
                         {
-                            SERIALCONSOLE.print(i + 1);
-                            SERIALCONSOLE.print(" ");
+                            Logger::console("    Overvoltage Cell %i ", i+1);
                         }
                     }
-                    SERIALCONSOLE.println();
                 }
-                if (faults & 2)
+             if (faults & 2)
                 {
-                    SERIALCONSOLE.print("    Undervoltage Cell Numbers (1-6): ");
                     for (int i = 0; i < 6; i++)
                     {
                         if (CUV & (1 << i))
                         {
-                            SERIALCONSOLE.print(i + 1);
-                            SERIALCONSOLE.print(" ");
+                            Logger::console("    Undervoltage Cell %i ", i+1);
                         }
                     }
-                    SERIALCONSOLE.println();
                 }
                 if (faults & 4)
                 {
@@ -492,62 +491,6 @@ void BMSModuleManager::printPackSummary()
                     communicationErrors += 1;
                 }
             }
-            if (faults > 0 || alerts > 0)
-                SERIALCONSOLE.println();
-        }
-    }
-}
-
-void BMSModuleManager::printPackDetails()
-{
-    uint8_t faults;
-    uint8_t alerts;
-    uint8_t COV;
-    uint8_t CUV;
-    int cellNum = 0;
-
-    Logger::console("");
-    Logger::console("");
-    Logger::console("");
-    Logger::console("                                         Pack Status:");
-    if (isFaulted)
-        Logger::console("                                           FAULTED!");
-    else
-        Logger::console("                                      All systems go!");
-    Logger::console("Modules: %i    Voltage: %fV   Avg Cell Voltage: %fV     Avg Temp: %fC ", numFoundModules,
-                    getPackVoltage(), getAvgCellVolt(), getAvgTemperature());
-    Logger::console("");
-    for (int y = 1; y < 63; y++)
-    {
-        if (modules[y].isExisting())
-        {
-            faults = modules[y].getFaults();
-            alerts = modules[y].getAlerts();
-            COV = modules[y].getCOVCells();
-            CUV = modules[y].getCUVCells();
-
-            SERIALCONSOLE.print("Module #");
-            SERIALCONSOLE.print(y);
-            if (y < 10)
-                SERIALCONSOLE.print(" ");
-            SERIALCONSOLE.print("  ");
-            SERIALCONSOLE.print(modules[y].getModuleVoltage());
-            SERIALCONSOLE.print("V");
-            for (int i = 0; i < 6; i++)
-            {
-                if (cellNum < 10)
-                    SERIALCONSOLE.print(" ");
-                SERIALCONSOLE.print("  Cell");
-                SERIALCONSOLE.print(cellNum++);
-                SERIALCONSOLE.print(": ");
-                SERIALCONSOLE.print(modules[y].getCellVoltage(i));
-                SERIALCONSOLE.print("V");
-            }
-            SERIALCONSOLE.print("  Neg Term Temp: ");
-            SERIALCONSOLE.print(modules[y].getTemperature(0));
-            SERIALCONSOLE.print("C  Pos Term Temp: ");
-            SERIALCONSOLE.print(modules[y].getTemperature(1));
-            SERIALCONSOLE.println("C");
         }
     }
 }

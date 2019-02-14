@@ -56,7 +56,8 @@ class Logger
     static uint32_t lastLogTime;
 
     static void log(LogLevel, char *format, va_list);
-    static void logMessage(char *format, va_list args);
+    static void ardprintf(char *format, va_list);
+    static int countParams(char *str);
 };
 
 #endif /* LOGGER_H_ */

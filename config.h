@@ -24,11 +24,14 @@
 // Victron Bus
 #define CANVE Can0        // TX 3, RX 4
 
-// Currentsensor
-#define INCURRENT A14
+// Status LED
+#define LED  13       
 
-#define PRELOAD   24
-#define CONTACTOR 25
+// Currentsensor
+#define INCURRENT A1
+
+#define PRELOAD   38
+#define CONTACTOR 39
 
 #define REG_DEV_STATUS      1
 #define REG_GPAI            1
@@ -81,7 +84,7 @@ static const float QCellSpecCurve0_2C[SizeCellSpecCurve0_2C][2] = {
         {  3.10f,    180.0f  },
         {  3.15f,    221.0f  },
         {  3.20f,    278.0f  },
-        {  3.25f,    360.0f  }, // Norm min
+        {  3.25f,    360.0f  }, // Norm min 39.00
         {  3.30f,    459.0f  },
         {  3.35f,    577.0f  },
         {  3.40f,    736.0f  },
@@ -94,7 +97,7 @@ static const float QCellSpecCurve0_2C[SizeCellSpecCurve0_2C][2] = {
         {  3.90f,   2804.0f  },
         {  4.00f,   3087.0f  },
         {  4.02f,   3143.0f  },
-        {  4.06f,   3283.0f  }, // Norm max
+        {  4.06f,   3283.0f  }, // Norm max 48.72
         {  4.08f,   3331.0f  },
         {  4.10f,   3361.0f  },
         {  4.12f,   3378.0f  },
@@ -157,8 +160,8 @@ typedef struct {
 
     float QBattCurr;
     float QBattCurrKwh;
-    float QCycleMeasuredKwh;
-    float QCycleStartKwh;
+    float QCycleMeasuredKwh  = 0.0f;
+    float QCycleStartKwh     = 0.0f;
     
     float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
     float IBattPlanDischargeMax = 0.1f;
@@ -173,4 +176,3 @@ typedef struct {
     unsigned long Alarm = ERROR_NONE;
     unsigned long Error = ERROR_NONE;
 } BMSStatus;
-

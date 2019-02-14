@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "Logger.h"
 
 class BMSUtil
 {
@@ -41,37 +40,15 @@ class BMSUtil
         if (isWrite)
             SERIALBMS.write(genCRC(data, dataLen));
 
-        if (Logger::isDebug())
-        {
-            SERIALCONSOLE.print("Sending: ");
-            SERIALCONSOLE.print(addrByte, HEX);
-            SERIALCONSOLE.print(" ");
-            for (int x = 1; x < dataLen; x++)
-            {
-                SERIALCONSOLE.print(data[x], HEX);
-                SERIALCONSOLE.print(" ");
-            }
-            if (isWrite)
-                SERIALCONSOLE.print(genCRC(data, dataLen), HEX);
-            SERIALCONSOLE.println();
-        }
-
         data[0] = orig;
     }
 
     static int getReply(uint8_t *data, int maxLen)
     {
         int numBytes = 0;
-        if (Logger::isDebug())
-            SERIALCONSOLE.print("Reply: ");
         while (SERIALBMS.available() && numBytes < maxLen)
         {
             data[numBytes] = SERIALBMS.read();
-            if (Logger::isDebug())
-            {
-                SERIALCONSOLE.print(data[numBytes], HEX);
-                SERIALCONSOLE.print(" ");
-            }
             numBytes++;
         }
         if (maxLen == numBytes)
@@ -79,8 +56,6 @@ class BMSUtil
             while (SERIALBMS.available())
                 SERIALBMS.read();
         }
-        if (Logger::isDebug())
-            SERIALCONSOLE.println();
         return numBytes;
     }
 
