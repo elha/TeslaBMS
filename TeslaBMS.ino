@@ -95,7 +95,7 @@ void setup_settings()
   settings.IBattWarnChargeMax    = 80.0f;
   settings.IBattWarnDischargeMax = 80.0f;
   settings.IBattOptiChargeMax    = 70.0f;
-  settings.IBattOptiChargeMin    =  4.00f;
+  settings.IBattOptiChargeMin    =  10.00f;
   settings.IBattOptiDischargeMax = 70.0f;
 
   settings.TBattNormMin = 15.0f;
@@ -254,7 +254,8 @@ void loop_bms()
       if (bms.balanceCells(settings.UCellNormBalanceDiff))
         Logger::info("Balancing Pack");
 
-    status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge 
+    status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);   
+    if (status.IBattPlanChargeMax < settings.IBattOptiChargeMin) status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge
   }
   else if (status.UCellCurrMax < settings.UCellWarnMax)
   {
@@ -500,6 +501,7 @@ void loop_vecan() // communication with Victron system over CAN
   CANVE.write(msg);
 
   // bmsmanufacturer
+  /*
   msg.ext = 0;
   msg.id = 0x370;
   msg.len = 8;
@@ -513,6 +515,7 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[7] = 'B';
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
+  */
 }
 
 void loop_readcan()
