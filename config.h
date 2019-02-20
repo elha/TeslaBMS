@@ -109,6 +109,7 @@ typedef struct {
     
     uint8_t ConfigBattParallelCells;
     uint8_t ConfigBattSerialCells;
+    uint8_t ConfigBattParallelStrings;
     
     float UBattNormMin;
     float UBattNormMax;

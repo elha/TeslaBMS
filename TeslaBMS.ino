@@ -75,8 +75,9 @@ void setup_settings()
   Logger::console("Loading defaults");
   settings.version = 1;
 
-  settings.ConfigBattParallelCells = 74;
-  settings.ConfigBattSerialCells   = 12;
+  settings.ConfigBattParallelCells   = 74;
+  settings.ConfigBattSerialCells     = 12;
+  settings.ConfigBattParallelStrings =  2;
   
   settings.UCellWarnMin = 3.10f;
   settings.UCellNormMin = 3.25f;
@@ -101,8 +102,8 @@ void setup_settings()
   settings.TBattNormMin = 15.0f;
   settings.TBattNormMax = 32.0f;
 
-  settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells;
-  settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells;
+  settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings;
+  settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings;
   settings.QBattNorm    = settings.QBattNormMax - settings.QBattNormMin;
   settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
@@ -222,7 +223,7 @@ void loop_querycurrent()
 void loop_querybatt()
 {
   bms.getAllVoltTemp();
-  status.UBattCurr = bms.getPackVoltage();
+  status.UBattCurr = (double)bms.getPackVoltage() / (double)settings.ConfigBattParallelStrings;
   
   status.UCellCurrMin = bms.getLowCellVolt();
   status.UCellCurrAvg = bms.getAvgCellVolt();
@@ -397,7 +398,7 @@ void loop_calc()
   // QBattNorm           = 100% Capacity within Norm-range [Ah]
   // QBattCurr           = current Capacity [Ah]
   // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
-  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells - settings.QBattNormMin;  
+  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
   status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
 
   status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
@@ -569,7 +570,7 @@ float getQBattNorm(float UCellCurr)
       out += x * (QCurr - last);
       last = QCurr;
     }
-    return out * 0.001l * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells;
+    return out * 0.001l * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
 }
 
 byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interval) 
