@@ -5,7 +5,7 @@ Based off work done by Collin Kidder and Tom de Bree.
 
 # Homestorage
 
-Implementing a bridge between two Tesla Model S battery modules (24V each, serial resulting in 12s74p) and a victron energy setup using a CCGX and a MultiGrid 48/3000/35 inverter.
+Implementing a bridge between four Tesla Model S battery modules (24V each, serial resulting in 2p2s-6s74p) and a victron energy setup using a CCGX and a MultiGrid 48/3000/35 inverter.
 
 - Simplified Setup using a Teensy 3.5
 - using the built-in CAN-interface 
@@ -18,7 +18,7 @@ Implementing a bridge between two Tesla Model S battery modules (24V each, seria
 
 - Curr  -> Measurements
 - Plan  -> Planned values
-- Opti  -> optimal Operating-Parameters 3,30V - 4,00V, 0,1C / 25A
+- Opti  -> optimal Operating-Parameters 3,30V - 4,00V, 0,1C / 35A
 - Norm  -> Shutoff normal Operation     3,25V - 4,06V, 0,0C / 0A
 - Warn  -> Warning CCGX                 3,20V - 4,10V   
 - Err   -> Alarm CCGX                   under - over 

@@ -6,7 +6,7 @@ class BMSModuleManager
 {
   public:
     BMSModuleManager();
-    bool balanceCells(float minDiffV);
+    bool balanceCells(double minDiffV);
     void setupBoards();
     void findBoards();
     void renumberBoardIDs();
@@ -17,20 +17,20 @@ class BMSModuleManager
     void getAllVoltTemp();
     void readSetpoints();
     void setBatteryID(int id); 
-    void setUnderVolt(float newVal);
-    void setOverVolt(float newVal);
-    void setOverTemp(float newVal);
-    void setBalanceV(float newVal);
-    void setBalanceHyst(float newVal);
-    float getPackVoltage();
-    float getLowTemperature();
-    float getHighTemperature();
-    float getAvgTemperature();
-    float getAvgCellVolt();
-    float getLowCellVolt();
-    float getHighCellVolt();
-    float getHighVoltage();
-    float getLowVoltage();
+    void setUnderVolt(double newVal);
+    void setOverVolt(double newVal);
+    void setOverTemp(double newVal);
+    void setBalanceV(double newVal);
+    void setBalanceHyst(double newVal);
+    double getPackVoltage();
+    double getLowTemperature();
+    double getHighTemperature();
+    double getAvgTemperature();
+    double getAvgCellVolt();
+    double getLowCellVolt();
+    double getHighCellVolt();
+    double getHighVoltage();
+    double getLowVoltage();
     void printPackSummary();
     void printPackDetails();
     long getCommunicationErrors();

@@ -6,17 +6,17 @@ class BMSModule
     BMSModule();
     void readStatus();
     bool readModuleValues();
-    bool needsBalancing(float minDiffV);
+    bool needsBalancing(double minDiffV);
     void balanceCells();
-    float getCellVoltage(int cell);
-    float getLowCellV();
-    float getHighCellV();
-    float getAverageV();
-    float getLowTemp();
-    float getHighTemp();
-    float getAvgTemp();
-    float getModuleVoltage();
-    float getTemperature(int temp);
+    double getCellVoltage(int cell);
+    double getLowCellV();
+    double getHighCellV();
+    double getAverageV();
+    double getLowTemp();
+    double getHighTemp();
+    double getAvgTemp();
+    double getModuleVoltage();
+    double getTemperature(int temp);
     uint8_t getFaults();
     uint8_t getAlerts();
     uint8_t getCOVCells();
@@ -27,9 +27,9 @@ class BMSModule
     void setExists(bool ex);
 
   private:
-    float cellVolt[6]; // calculated as 16 bit value * 6.250 / 16383 = volts
-    float moduleVolt;      // calculated as 16 bit value * 33.333 / 16383 = volts
-    float temperatures[2]; // Don't know the proper scaling at this point
+    double cellVolt[6]; // calculated as 16 bit value * 6.250 / 16383 = volts
+    double moduleVolt;      // calculated as 16 bit value * 33.333 / 16383 = volts
+    double temperatures[2]; // Don't know the proper scaling at this point
     bool exists;
     int alerts;
     int faults;

@@ -79,35 +79,35 @@ void setup_settings()
   settings.ConfigBattSerialCells     = 12;
   settings.ConfigBattParallelStrings =  2;
   
-  settings.UCellWarnMin = 3.10f;
-  settings.UCellNormMin = 3.25f;
-  settings.UCellOptiMin = 3.30f;
+  settings.UCellWarnMin = 3.10;
+  settings.UCellNormMin = 3.25;
+  settings.UCellOptiMin = 3.30;
 
-  settings.UCellOptiMax = 4.00f;
-  settings.UCellNormMax = 4.06f;
-  settings.UCellWarnMax = 4.10f;
+  settings.UCellOptiMax = 4.00;
+  settings.UCellNormMax = 4.06;
+  settings.UCellWarnMax = 4.10;
 
-  settings.UBattNormMin = settings.UCellNormMin * (float)settings.ConfigBattSerialCells; 
-  settings.UBattNormMax = settings.UCellNormMax * (float)settings.ConfigBattSerialCells;
+  settings.UBattNormMin = settings.UCellNormMin * (double)settings.ConfigBattSerialCells; 
+  settings.UBattNormMax = settings.UCellNormMax * (double)settings.ConfigBattSerialCells;
 
-  settings.UCellNormBalanceDiff = 0.03f;
-  settings.UCellWarnBalanceDiff = 0.06f;
+  settings.UCellNormBalanceDiff = 0.03;
+  settings.UCellWarnBalanceDiff = 0.06;
 
-  settings.IBattWarnChargeMax    = 80.0f;
-  settings.IBattWarnDischargeMax = 80.0f;
-  settings.IBattOptiChargeMax    = 70.0f;
-  settings.IBattOptiChargeMin    =  10.00f;
-  settings.IBattOptiDischargeMax = 70.0f;
+  settings.IBattWarnChargeMax    = 80.0;
+  settings.IBattWarnDischargeMax = 80.0;
+  settings.IBattOptiChargeMax    = 70.0;
+  settings.IBattOptiChargeMin    = 10.0;
+  settings.IBattOptiDischargeMax = 70.0;
 
-  settings.TBattNormMin = 15.0f;
-  settings.TBattNormMax = 32.0f;
+  settings.TBattNormMin = 15.0;
+  settings.TBattNormMax = 32.0;
 
-  settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings;
-  settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings;
+  settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
+  settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
   settings.QBattNorm    = settings.QBattNormMax - settings.QBattNormMin;
   settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
-  settings.ConstInCurrentOffset = 0.0f; // will be set on first measurement
+  settings.ConstInCurrentOffset = 0.0; // will be set on first measurement
   settings.ConstInCurrentSampleFreq = 256;
   
   settings.logLevel = Logger::Info;
@@ -134,7 +134,7 @@ void setup_bms()
   bms.findBoards();
   bms.clearFaults();
 
-  status.SohBattCurr = 1.0f;
+  status.SohBattCurr = 1.0;
 }
 
 void setup_adc()
@@ -208,13 +208,13 @@ void loop_querycurrent()
   
   if(status.IBattCurr >= 0)
   {
-    status.IBattCurrCharge    =  0.0f;
+    status.IBattCurrCharge    = 0.0;
     status.IBattCurrDischarge = +status.IBattCurr;
   }
   else
   {
     status.IBattCurrCharge    = -status.IBattCurr;
-    status.IBattCurrDischarge = 0.0f;
+    status.IBattCurrDischarge = 0.0;
   }
 
   status.QCycleMeasuredKwh += status.IBattCurr / (double)3600.0 /(double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
@@ -376,18 +376,18 @@ void loop_contactor()
     status.State = 4;
     Logger::info("Contactor - closed, preload released");  
   }
-  else if ((status.State == 4 || status.State == 5) && status.IBattCurr > 0.0f)  // charging -> discharging
+  else if ((status.State == 4 || status.State == 5) && status.IBattCurr > 0.0)  // charging -> discharging
   {    
     status.State = 6;
     status.QCycleStartKwh = status.QBattCurrKwh;
-    status.QCycleMeasuredKwh = 0.0f;
+    status.QCycleMeasuredKwh = 0.0;
     Logger::info("Contactor - discharging");  
   }
-  else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0f)  // discharging -> charging
+  else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0)  // discharging -> charging
   {    
     status.State = 5;
     status.QCycleStartKwh = status.QBattCurrKwh;
-    status.QCycleMeasuredKwh = 0.0f;
+    status.QCycleMeasuredKwh = 0.0;
     Logger::info("Contactor - charging");  
   }
 
@@ -398,15 +398,15 @@ void loop_calc()
   // QBattNorm           = 100% Capacity within Norm-range [Ah]
   // QBattCurr           = current Capacity [Ah]
   // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
-  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
+  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
   status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
 
   status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
-  if(status.SocBattCurr < 0.0f) status.SocBattCurr = 0.0f;
-  if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
+  if(status.SocBattCurr < 0.0) status.SocBattCurr = 0.0;
+  if(status.SocBattCurr > 1.0) status.SocBattCurr = 1.0;
   
   // SohBattCurr = QBattCurr / QBattNorm
-  if(abs(status.QCycleMeasuredKwh)>0.2f && abs(status.QCycleStartKwh - status.QBattCurrKwh)>0.2f)
+  if(abs(status.QCycleMeasuredKwh) > 0.2 && abs(status.QCycleStartKwh - status.QBattCurrKwh) > 0.2)
     status.SohBattCurr = abs(status.QCycleMeasuredKwh) / abs(status.QCycleStartKwh - status.QBattCurrKwh);  
 }
 
@@ -416,7 +416,7 @@ void loop_console()
                         status.QCycleMeasuredKwh,
                         status.QBattCurr, settings.QBattNorm,
                         status.QBattCurrKwh, settings.QBattNormKwh, 
-                        status.SocBattCurr * 100.0f, status.SohBattCurr * 100.0f,
+                        status.SocBattCurr * 100.0, status.SohBattCurr * 100.0,
                         status.IBattCurr, status.UBattCurr, status.UCellCurrAvg, status.UCellCurrDelta,
                         status.TBattCurrMax );
 
@@ -433,23 +433,23 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x351;
   msg.len = 8;
-  msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10.0f));
-  msg.buf[1] = highByte(uint16_t(settings.UBattNormMax * 10.0f));
-  msg.buf[2] = lowByte(uint16_t(status.IBattPlanChargeMax * 10.0f));
-  msg.buf[3] = highByte(uint16_t(status.IBattPlanChargeMax * 10.0f));
-  msg.buf[4] = lowByte(uint16_t(status.IBattPlanDischargeMax * 10.0f));
-  msg.buf[5] = highByte(uint16_t(status.IBattPlanDischargeMax * 10.0f));
-  msg.buf[6] = lowByte(uint16_t(settings.UBattNormMin * 10.0f));
-  msg.buf[7] = highByte(uint16_t(settings.UBattNormMin * 10.0f));
+  msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10.0));
+  msg.buf[1] = highByte(uint16_t(settings.UBattNormMax * 10.0));
+  msg.buf[2] = lowByte(uint16_t(status.IBattPlanChargeMax * 10.0));
+  msg.buf[3] = highByte(uint16_t(status.IBattPlanChargeMax * 10.0));
+  msg.buf[4] = lowByte(uint16_t(status.IBattPlanDischargeMax * 10.0));
+  msg.buf[5] = highByte(uint16_t(status.IBattPlanDischargeMax * 10.0));
+  msg.buf[6] = lowByte(uint16_t(settings.UBattNormMin * 10.0));
+  msg.buf[7] = highByte(uint16_t(settings.UBattNormMin * 10.0));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
   msg.ext = 0;
   msg.id = 0x355;
   msg.len = 8;
-  msg.buf[0] = (byte)(status.SocBattCurr * 100.0f);
+  msg.buf[0] = (byte)(status.SocBattCurr * 100.0);
   msg.buf[1] = 0;
-  msg.buf[2] = (byte)(status.SohBattCurr * 100.0f);
+  msg.buf[2] = (byte)(status.SohBattCurr * 100.0);
   msg.buf[3] = 0;
   msg.buf[4] = 0; //should be 0.01% SOC but does not work for me
   msg.buf[5] = 0;
@@ -461,12 +461,12 @@ void loop_vecan() // communication with Victron system over CAN
   msg.ext = 0;
   msg.id = 0x356;
   msg.len = 8;
-  msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0f));
-  msg.buf[1] = highByte(int16_t(status.UBattCurr * 100.0f));
-  msg.buf[2] = lowByte(int16_t(status.IBattCurr * -10.0f));
-  msg.buf[3] = highByte(int16_t(status.IBattCurr * -10.0f));
-  msg.buf[4] = lowByte(int16_t(status.TBattCurrMax * 10.0f));
-  msg.buf[5] = highByte(int16_t(status.TBattCurrMax * 10.0f));
+  msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0));
+  msg.buf[1] = highByte(int16_t(status.UBattCurr * 100.0));
+  msg.buf[2] = lowByte(int16_t(status.IBattCurr * -10.0));
+  msg.buf[3] = highByte(int16_t(status.IBattCurr * -10.0));
+  msg.buf[4] = lowByte(int16_t(status.TBattCurrMax * 10.0));
+  msg.buf[5] = highByte(int16_t(status.TBattCurrMax * 10.0));
   msg.buf[7] = 0;
   msg.buf[8] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
@@ -535,7 +535,7 @@ void loop_comerror()
 }
 
 // helper functions
-float getQCellSpec(float UCellCurr)
+double getQCellSpec(double UCellCurr)
 {
     for (int x = 1; x < SizeCellSpecCurve0_2C; x++)
     {
@@ -556,17 +556,17 @@ float getQCellSpec(float UCellCurr)
         return (QCellSpecL + (UCellCurrDiff / UCellSpecDiff * QCellSpecDiff)) * 0.001l;        
       }
     }
-    return 100.0f;
+    return 100.0;
 }
 
-float getQBattNorm(float UCellCurr)
+double getQBattNorm(double UCellCurr)
 {
-    static const double step = 0.002f;
-    double out = 0.0l;
+    static const double step = 0.002;
+    double out = 0.0;
     double last = getQCellSpec(settings.UCellNormMin);
-    for (float x = settings.UCellNormMin; x <= UCellCurr; x+=step)
+    for (double x = settings.UCellNormMin; x <= UCellCurr; x+=step)
     {
-      float QCurr = getQCellSpec(x);
+      double QCurr = getQCellSpec(x);
       out += x * (QCurr - last);
       last = QCurr;
     }

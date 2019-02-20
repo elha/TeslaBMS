@@ -7,11 +7,11 @@ BMSModule::BMSModule()
 {
     for (int i = 0; i < 6; i++)
     {
-        cellVolt[i] = 0.0f;
+        cellVolt[i] = 0.0;
     }
-    moduleVolt = 0.0f;
-    temperatures[0] = 0.0f;
-    temperatures[1] = 0.0f;
+    moduleVolt = 0.0;
+    temperatures[0] = 0.0;
+    temperatures[1] = 0.0;
     exists = false;
     moduleAddress = 0;
 }
@@ -128,7 +128,7 @@ bool BMSModule::readModuleValues()
                 tempTemp = (1.78l / ((double)(buff[17 + (i * 2)] * 256 + buff[18  + (i * 2)] + 2) / 33046.0l) - 3.57l);
                 tempTemp *= 1000.0l;
                 tempCalc = 1.0l / (0.0007610373573l + (0.0002728524832l * logf(tempTemp)) + (powf(logf(tempTemp), 3) * 0.0000001022822735l));
-                temperatures[i] = tempCalc - 273.15f;
+                temperatures[i] = tempCalc - 273.15;
             }
 
             Logger::debug("Got voltage and temperature readings");
@@ -152,7 +152,7 @@ bool BMSModule::readModuleValues()
 }
 
 // balancing only needed if CellVoltageDiff is highter than supplied value
-bool BMSModule::needsBalancing(float minDiffV)
+bool BMSModule::needsBalancing(double minDiffV)
 {
     return getHighCellV() - getLowCellV() >= minDiffV ; 
 }
@@ -208,64 +208,64 @@ void BMSModule::balanceCells()
     }
 }
 
-float BMSModule::getCellVoltage(int cell)
+double BMSModule::getCellVoltage(int cell)
 {
     if (cell < 0 || cell > 5)
-        return 0.0f;
+        return 0.0;
     return cellVolt[cell];
 }
 
-float BMSModule::getLowCellV()
+double BMSModule::getLowCellV()
 {
-    float lowVal = 10.0f;
+    double lowVal = 10.0;
     for (int i = 0; i < 6; i++)
         if (cellVolt[i] < lowVal)
             lowVal = cellVolt[i];
     return lowVal;
 }
 
-float BMSModule::getHighCellV()
+double BMSModule::getHighCellV()
 {
-    float hiVal = 0.0f;
+    double hiVal = 0.0;
     for (int i = 0; i < 6; i++)
         if (cellVolt[i] > hiVal)
             hiVal = cellVolt[i];
     return hiVal;
 }
 
-float BMSModule::getAverageV()
+double BMSModule::getAverageV()
 {
-    float avgVal = 0.0f;
+    double avgVal = 0.0;
     for (int i = 0; i < 6; i++)
         avgVal += cellVolt[i];
-    avgVal /= 6.0f;
+    avgVal /= 6.0;
     return avgVal;
 }
 
-float BMSModule::getLowTemp()
+double BMSModule::getLowTemp()
 {
     return (temperatures[0] < temperatures[1]) ? temperatures[0] : temperatures[1];
 }
 
-float BMSModule::getHighTemp()
+double BMSModule::getHighTemp()
 {
     return (temperatures[0] < temperatures[1]) ? temperatures[1] : temperatures[0];
 }
 
-float BMSModule::getAvgTemp()
+double BMSModule::getAvgTemp()
 {
-    return (temperatures[0] + temperatures[1]) / 2.0f;
+    return (temperatures[0] + temperatures[1]) / 2.0;
 }
 
-float BMSModule::getModuleVoltage()
+double BMSModule::getModuleVoltage()
 {
     return moduleVolt;
 }
 
-float BMSModule::getTemperature(int temp)
+double BMSModule::getTemperature(int temp)
 {
     if (temp < 0 || temp > 1)
-        return 0.0f;
+        return 0.0;
     return temperatures[temp];
 }
 

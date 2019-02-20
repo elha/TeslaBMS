@@ -13,7 +13,7 @@ BMSModuleManager::BMSModuleManager()
     isFaulted = false;
 }
 
-bool BMSModuleManager::balanceCells(float minDiffV)
+bool BMSModuleManager::balanceCells(double minDiffV)
 {
     bool out = false;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
@@ -256,9 +256,9 @@ void BMSModuleManager::getAllVoltTemp()
     }
 }
 
-float BMSModuleManager::getLowCellVolt()
+double BMSModuleManager::getLowCellVolt()
 {
-    float LowCellVolt = 5.0;
+    double LowCellVolt = 5.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
@@ -270,9 +270,9 @@ float BMSModuleManager::getLowCellVolt()
     return LowCellVolt;
 }
 
-float BMSModuleManager::getHighCellVolt()
+double BMSModuleManager::getHighCellVolt()
 {
-    float HighCellVolt = 5.0;
+    double HighCellVolt = 5.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
@@ -284,9 +284,9 @@ float BMSModuleManager::getHighCellVolt()
     return HighCellVolt;
 }
 
-float BMSModuleManager::getPackVoltage()
+double BMSModuleManager::getPackVoltage()
 {
-    float packVolt = 0.0;
+    double packVolt = 0.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
@@ -302,9 +302,9 @@ void BMSModuleManager::setBatteryID(int id)
     batteryID = id;
 }
 
-float BMSModuleManager::getAvgTemperature()
+double BMSModuleManager::getAvgTemperature()
 {
-    float avg = 0.0f;
+    double avg = 0.0;
     int y = 0; //counter for modules below -70 (no sensors connected)
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
@@ -320,14 +320,14 @@ float BMSModuleManager::getAvgTemperature()
             }
         }
     }
-    avg = avg / (float)(numFoundModules - y);
+    avg = avg / (double)(numFoundModules - y);
 
     return avg;
 }
 
-float BMSModuleManager::getLowTemperature()
+double BMSModuleManager::getLowTemperature()
 {
-    float Low = 100.0f;
+    double Low = 100.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
@@ -341,9 +341,9 @@ float BMSModuleManager::getLowTemperature()
     return Low;
 }
 
-float BMSModuleManager::getHighTemperature()
+double BMSModuleManager::getHighTemperature()
 {
-    float High = 0.0f;
+    double High = 0.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
@@ -357,15 +357,15 @@ float BMSModuleManager::getHighTemperature()
     return High;
 }
 
-float BMSModuleManager::getAvgCellVolt()
+double BMSModuleManager::getAvgCellVolt()
 {
-    float avg = 0.0f;
+    double avg = 0.0;
     for (int x = 1; x <= MAX_MODULE_ADDR; x++)
     {
         if (modules[x].isExisting())
             avg += modules[x].getAverageV();
     }
-    avg = avg / (float)numFoundModules;
+    avg = avg / (double)numFoundModules;
 
     return avg;
 }
