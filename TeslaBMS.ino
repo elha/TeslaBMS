@@ -77,7 +77,7 @@ void setup_settings()
 
   settings.ConfigBattParallelCells   = 74;
   settings.ConfigBattSerialCells     = 12;
-  settings.ConfigBattParallelStrings =  2;
+  settings.ConfigBattParallelStrings =  1;
   
   settings.UCellWarnMin = 3.10;
   settings.UCellNormMin = 3.25;
@@ -203,7 +203,7 @@ void loop_querycurrent()
   value -= maxvalue * 0.5;
   
   // ACS758xCB 50A bidirectional, 50% = 0A, 40mV/A @ 5V = 40/5000 = 1/125
-  status.IBattCurr = (value / maxvalue) * 125.0l + (double)settings.ConstInCurrentOffset;
+  status.IBattCurr = (value / maxvalue) * 125.0 + (double)settings.ConstInCurrentOffset;
   if(settings.ConstInCurrentOffset == 0) settings.ConstInCurrentOffset = -(double)status.IBattCurr;
   
   if(status.IBattCurr >= 0)
@@ -252,8 +252,10 @@ void loop_bms()
   else if (status.UCellCurrMax < settings.UCellNormMax)
   {
     if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
-      if (bms.balanceCells(settings.UCellNormBalanceDiff))
+      if (bms.balanceCells(settings.UCellNormBalanceDiff)) {
         Logger::info("Balancing Pack");
+        status.Alarm |= ERROR_CELLIMBALANCE; // not a real alarm, but wanted to be notified in CCGX
+      }
 
     status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);   
     if (status.IBattPlanChargeMax < settings.IBattOptiChargeMin) status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge
@@ -261,11 +263,13 @@ void loop_bms()
   else if (status.UCellCurrMax < settings.UCellWarnMax)
   {
     if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
-      if (bms.balanceCells(settings.UCellNormBalanceDiff))
+      if (bms.balanceCells(settings.UCellNormBalanceDiff)) {
         Logger::info("Balancing Pack");
+        status.Alarm |= ERROR_CELLIMBALANCE; // not a real alarm, but wanted to be notified in CCGX
+      }
 
     status.IBattPlanChargeMax = 0;
-    status.Alarm |= ERROR_HIGHCELLVOLTAGE;
+    // status.Alarm |= ERROR_HIGHCELLVOLTAGE; // do not fire alarm, happens often
   }
   else //if (status.UCellCurrMax < settings.UCellErrorMax) or worse
   {
@@ -284,7 +288,7 @@ void loop_bms()
   else if (status.UCellCurrMin > settings.UCellWarnMin)
   {
     status.IBattPlanDischargeMax = 0;
-    status.Alarm |= ERROR_LOWCELLVOLTAGE;
+    // status.Alarm |= ERROR_LOWCELLVOLTAGE; // do not fire alarm, happens often
   }
   else //if (status.UCellCurrMin > settings.UCellErrorMin) or worse
   {
@@ -296,43 +300,43 @@ void loop_bms()
   if (status.TBattCurrMax > settings.TBattNormMax)
   {
     status.Error |= ERROR_HIGHPACKTEMP;
-    Logger::error("Alarm - high battery temp %f over %f", status.TBattCurrMax, settings.TBattNormMax);
+    Logger::error("Error - high battery temp %f over %f", status.TBattCurrMax, settings.TBattNormMax);
   }
 
   if (status.TBattCurrMin < settings.TBattNormMin)
   {
     status.Error |= ERROR_LOWPACKTEMP;
-    Logger::error("Alarm - low battery temp %f under %f", status.TBattCurrMin, settings.TBattNormMin);
+    Logger::error("Error - low battery temp %f under %f", status.TBattCurrMin, settings.TBattNormMin);
   }
 
   if (status.IBattCurrDischarge > settings.IBattWarnDischargeMax)
   {
     status.Error |= ERROR_HIGHBATTDISCHARGECURRENT;
-    Logger::error("Alarm - high discharge current %f over %f", status.IBattCurrDischarge, settings.IBattWarnDischargeMax);
+    Logger::error("Error - high discharge current %f over %f", status.IBattCurrDischarge, settings.IBattWarnDischargeMax);
   }
 
   if (status.IBattCurrCharge > settings.IBattWarnChargeMax)
   {
     status.Error |= ERROR_HIGHBATTCHARGECURRENT;
-    Logger::error("Alarm - high charge current %f over %f", status.IBattCurrCharge, settings.IBattWarnChargeMax);
+    Logger::error("Error - high charge current %f over %f", status.IBattCurrCharge, settings.IBattWarnChargeMax);
   }
 
   if (bms.isFaulted)
   {
     status.Error |= ERROR_INTERNALFAILURE;
-    Logger::error("Alarm - internal failure");
+    Logger::error("Error - internal failure");
   }
 
   if (status.UCellCurrDelta > settings.UCellWarnBalanceDiff)
   {
     status.Error |= ERROR_CELLIMBALANCE;
-    Logger::error("Alarm - cell imbalance");
+    Logger::error("Error - cell imbalance");
   }
 
   if (bms.getCommunicationErrors() > status.CBmsWarnErrors)
   {
     status.Error |= ERROR_INTERNALFAILURE;
-    Logger::error("Alarm - bms communication errors");    
+    Logger::error("Error - bms communication errors");    
   }
 
   // shut off charging/discharging on Warning or Error
@@ -351,7 +355,7 @@ void loop_contactor()
     digitalWrite(PRELOAD, LOW);
     digitalWrite(CONTACTOR, LOW);  
     status.State = 0;
-    Logger::error("Contactor - disconnect on alarm");  
+    Logger::error("Contactor - disconnect on error");  
   } 
   else if (status.State == 0 && status.Error == 0 && status.Alarm == 0) //  start preloading soon if normal state
   {
@@ -381,14 +385,14 @@ void loop_contactor()
     status.State = 6;
     status.QCycleStartKwh = status.QBattCurrKwh;
     status.QCycleMeasuredKwh = 0.0;
-    Logger::info("Contactor - discharging");  
+    Logger::info("Contactor - closed, started discharging");  
   }
   else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0)  // discharging -> charging
   {    
     status.State = 5;
     status.QCycleStartKwh = status.QBattCurrKwh;
     status.QCycleMeasuredKwh = 0.0;
-    Logger::info("Contactor - charging");  
+    Logger::info("Contactor - closed, started charging");  
   }
 
 }
@@ -553,7 +557,7 @@ double getQCellSpec(double UCellCurr)
         double UCellCurrDiff = UCellCurr  - UCellSpecL;
 
         // linear interpolation
-        return (QCellSpecL + (UCellCurrDiff / UCellSpecDiff * QCellSpecDiff)) * 0.001l;        
+        return (QCellSpecL + (UCellCurrDiff / UCellSpecDiff * QCellSpecDiff)) * 0.001;        
       }
     }
     return 100.0;
@@ -570,7 +574,7 @@ double getQBattNorm(double UCellCurr)
       out += x * (QCurr - last);
       last = QCurr;
     }
-    return out * 0.001l * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
+    return out * 0.001 * (double)settings.ConfigBattSerialCells * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
 }
 
 byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interval) 
