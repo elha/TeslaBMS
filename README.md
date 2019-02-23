@@ -20,7 +20,7 @@ Implementing a bridge between four Tesla Model S battery modules (24V each, seri
 - Plan  -> Planned values
 - Opti  -> optimal Operating-Parameters 3,30V - 4,00V, 0,1C / 35A
 - Norm  -> Shutoff normal Operation     3,25V - 4,06V, 0,0C / 0A
-- Warn  -> Warning CCGX                 3,20V - 4,10V   
+- Warn  -> Warning (disabled on CAN)    3,20V - 4,10V   
 - Err   -> Alarm CCGX                   under - over 
 
 - naming convention on variables: 
