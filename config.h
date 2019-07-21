@@ -30,7 +30,8 @@
 // Currentsensor
 #define INCURRENT A1
 
-#define PRELOAD   38
+#define COOLER   38
+// #define PRELOAD  38
 #define CONTACTOR 39
 
 #define REG_DEV_STATUS      1
@@ -133,7 +134,9 @@ typedef struct {
     double IBattOptiDischargeMax;
 
     double TBattNormMin;
+    double TBattOptiMax;
     double TBattNormMax;
+    double TBattWarnMax;
 
     double QBattNormMin;
     double QBattNormMax;    

@@ -25,6 +25,7 @@ void setup()
 
   setup_adc();
   setup_bms();
+  setup_cooler();
 }
 
 void loop()
@@ -43,6 +44,7 @@ void loop()
 
     // logic
     loop_bms();
+    loop_cooler();
 
     // output
     loop_vecan();
@@ -77,7 +79,7 @@ void setup_settings()
 
   settings.ConfigBattParallelCells   = 74;
   settings.ConfigBattSerialCells     = 12;
-  settings.ConfigBattParallelStrings =  1;
+  settings.ConfigBattParallelStrings =  2;
   
   settings.UCellWarnMin = 3.10;
   settings.UCellNormMin = 3.25;
@@ -93,14 +95,17 @@ void setup_settings()
   settings.UCellNormBalanceDiff = 0.03;
   settings.UCellWarnBalanceDiff = 0.06;
 
+  settings.IBattOptiChargeMin    = 05.0;
+  settings.IBattOptiChargeMax    = 40.0;
   settings.IBattWarnChargeMax    = 80.0;
-  settings.IBattWarnDischargeMax = 80.0;
-  settings.IBattOptiChargeMax    = 70.0;
-  settings.IBattOptiChargeMin    = 10.0;
+  
   settings.IBattOptiDischargeMax = 70.0;
-
+  settings.IBattWarnDischargeMax = 90.0;
+  
   settings.TBattNormMin = 15.0;
-  settings.TBattNormMax = 32.0;
+  settings.TBattOptiMax = 24.0;
+  settings.TBattNormMax = 28.0;
+  settings.TBattWarnMax = 30.0;
 
   settings.QBattNormMin = getQCellSpec(settings.UCellNormMin) * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
   settings.QBattNormMax = getQCellSpec(settings.UCellNormMax) * (double)settings.ConfigBattParallelCells * (double)settings.ConfigBattParallelStrings;
@@ -123,10 +128,16 @@ void setup_bus()
   Logger::console("Initializing ...");
 }
 
+void setup_cooler()
+{
+  pinMode(COOLER, OUTPUT);
+  digitalWrite(COOLER, LOW);
+}
+
 void setup_bms()
 {
-  pinMode(PRELOAD, OUTPUT);
-  digitalWrite(PRELOAD, LOW);
+  // pinMode(PRELOAD, OUTPUT);
+  // digitalWrite(PRELOAD, LOW);
   pinMode(CONTACTOR, OUTPUT);
   digitalWrite(CONTACTOR, LOW);  
   
@@ -297,12 +308,18 @@ void loop_bms()
   }
 
   // check errors could implement warnings
-  if (status.TBattCurrMax > settings.TBattNormMax)
+  if (status.TBattCurrMax > settings.TBattWarnMax)
   {
     status.Error |= ERROR_HIGHPACKTEMP;
     Logger::error("Error - high battery temp %f over %f", status.TBattCurrMax, settings.TBattNormMax);
   }
-
+  else if (status.TBattCurrMax > settings.TBattNormMax)
+  {
+    status.IBattPlanDischargeMax *= 0.2;
+    status.IBattPlanChargeMax *= 0.2;
+    Logger::info("Overtemp, limiting Current", status.TBattCurrMax, settings.TBattNormMax);
+  }
+    
   if (status.TBattCurrMin < settings.TBattNormMin)
   {
     status.Error |= ERROR_LOWPACKTEMP;
@@ -347,12 +364,18 @@ void loop_bms()
   }
 }
 
+void loop_cooler()
+{
+  // turn on cooler if hotter than opt
+  digitalWrite(COOLER, status.TBattCurrMax > settings.TBattOptiMax);
+}
+
 void loop_contactor()
 {
   
   if (status.State > 0 && status.Error != 0) 
   {
-    digitalWrite(PRELOAD, LOW);
+    // digitalWrite(PRELOAD, LOW);
     digitalWrite(CONTACTOR, LOW);  
     status.State = 0;
     Logger::error("Contactor - disconnect on error");  
@@ -364,7 +387,7 @@ void loop_contactor()
   }
   else if (status.State == 1 && status.Error == 0 && status.Alarm == 0) //  start preloading if normal state
   {
-    digitalWrite(PRELOAD, HIGH);
+    // digitalWrite(PRELOAD, HIGH);
     status.State = 2;
     Logger::info("Contactor - preload");  
   }
@@ -376,7 +399,7 @@ void loop_contactor()
   }
   else if (status.State == 3)  // open preload
   {    
-    digitalWrite(PRELOAD, LOW);
+    // digitalWrite(PRELOAD, LOW);
     status.State = 4;
     Logger::info("Contactor - closed, preload released");  
   }
@@ -450,29 +473,25 @@ void loop_vecan() // communication with Victron system over CAN
 
   msg.ext = 0;
   msg.id = 0x355;
-  msg.len = 8;
+  msg.len = 6;
   msg.buf[0] = (byte)(status.SocBattCurr * 100.0);
   msg.buf[1] = 0;
   msg.buf[2] = (byte)(status.SohBattCurr * 100.0);
   msg.buf[3] = 0;
   msg.buf[4] = 0; //should be 0.01% SOC but does not work for me
   msg.buf[5] = 0;
-  msg.buf[6] = 0;
-  msg.buf[7] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
   msg.ext = 0;
   msg.id = 0x356;
-  msg.len = 8;
+  msg.len = 6;
   msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0));
   msg.buf[1] = highByte(int16_t(status.UBattCurr * 100.0));
   msg.buf[2] = lowByte(int16_t(status.IBattCurr * -10.0));
   msg.buf[3] = highByte(int16_t(status.IBattCurr * -10.0));
   msg.buf[4] = lowByte(int16_t(status.TBattCurrMax * 10.0));
   msg.buf[5] = highByte(int16_t(status.TBattCurrMax * 10.0));
-  msg.buf[7] = 0;
-  msg.buf[8] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
@@ -506,7 +525,6 @@ void loop_vecan() // communication with Victron system over CAN
   CANVE.write(msg);
 
   // bmsmanufacturer
-  /*
   msg.ext = 0;
   msg.id = 0x370;
   msg.len = 8;
@@ -520,7 +538,6 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[7] = 'B';
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
-  */
 }
 
 void loop_readcan()
