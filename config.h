@@ -72,37 +72,37 @@
 
 static const uint8_t SizeCellSpecCurve0_2C = 30;
 //         V,        mAh
-static const double QCellSpecCurve0_2C[SizeCellSpecCurve0_2C][2] = { 
-        {  2.50,      0.0  },
-        {  2.60,     15.0  },
-        {  2.70,     30.0  },
-        {  2.80,     52.0  },
-        {  2.85,     64.0  },
-        {  2.90,     80.0  },
-        {  2.95,    102.0  },
-        {  3.00,    121.0  },
-        {  3.05,    147.0  },
-        {  3.10,    180.0  },
-        {  3.15,    221.0  },
-        {  3.20,    278.0  },
-        {  3.25,    360.0  }, // Norm min 39.00
-        {  3.30,    459.0  },
-        {  3.35,    577.0  },
-        {  3.40,    736.0  },
-        {  3.45,    928.0  },
-        {  3.50,   1184.0  },
-        {  3.55,   1452.0  },
-        {  3.60,   1708.0  },
-        {  3.70,   2105.0  },
-        {  3.80,   2471.0  },
-        {  3.90,   2804.0  },
-        {  4.00,   3087.0  },
-        {  4.02,   3143.0  },
-        {  4.06,   3283.0  }, // Norm max 48.72
-        {  4.08,   3331.0  },
-        {  4.10,   3361.0  },
-        {  4.12,   3378.0  },
-        {  4.20,   3393.0  }};
+static const float QCellSpecCurve0_2C[SizeCellSpecCurve0_2C][2] = { 
+        {  2.50f,      0.0f  },
+        {  2.60f,     15.0f  },
+        {  2.70f,     30.0f  },
+        {  2.80f,     52.0f  },
+        {  2.85f,     64.0f  },
+        {  2.90f,     80.0f  },
+        {  2.95f,    102.0f  },
+        {  3.00f,    121.0f  },
+        {  3.05f,    147.0f  },
+        {  3.10f,    180.0f  },
+        {  3.15f,    221.0f  },
+        {  3.20f,    278.0f  },
+        {  3.25f,    360.0f  }, // Norm min 39.00
+        {  3.30f,    459.0f  },
+        {  3.35f,    577.0f  },
+        {  3.40f,    736.0f  },
+        {  3.45f,    928.0f  },
+        {  3.50f,   1184.0f  },
+        {  3.55f,   1452.0f  },
+        {  3.60f,   1708.0f  },
+        {  3.70f,   2105.0f  },
+        {  3.80f,   2471.0f  },
+        {  3.90f,   2804.0f  },
+        {  4.00f,   3087.0f  },
+        {  4.02f,   3143.0f  },
+        {  4.06f,   3283.0f  }, // Norm max 48.72
+        {  4.08f,   3331.0f  },
+        {  4.10f,   3361.0f  },
+        {  4.12f,   3378.0f  },
+        {  4.20f,   3393.0f  }};
 
 typedef struct {
     uint8_t version;
@@ -112,66 +112,66 @@ typedef struct {
     uint8_t ConfigBattSerialCells;
     uint8_t ConfigBattParallelStrings;
     
-    double UBattNormMin;
-    double UBattNormMax;
+    float UBattNormMin;
+    float UBattNormMax;
 
-    double UCellWarnMin;
-    double UCellNormMin;
-    double UCellOptiMin;
+    float UCellWarnMin;
+    float UCellNormMin;
+    float UCellOptiMin;
 
-    double UCellOptiMax;
-    double UCellNormMax;
-    double UCellWarnMax;
+    float UCellOptiMax;
+    float UCellNormMax;
+    float UCellWarnMax;
 
-    double UCellNormBalanceDiff;
-    double UCellWarnBalanceDiff;
+    float UCellNormBalanceDiff;
+    float UCellWarnBalanceDiff;
 
-    double IBattWarnChargeMax;
-    double IBattWarnDischargeMax;
+    float IBattWarnChargeMax;
+    float IBattWarnDischargeMax;
 
-    double IBattOptiChargeMax;
-    double IBattOptiChargeMin;
-    double IBattOptiDischargeMax;
+    float IBattOptiChargeMax;
+    float IBattOptiChargeMin;
+    float IBattOptiDischargeMax;
 
-    double TBattNormMin;
-    double TBattOptiMax;
-    double TBattNormMax;
-    double TBattWarnMax;
+    float TBattNormMin;
+    float TBattOptiMax;
+    float TBattNormMax;
+    float TBattWarnMax;
 
-    double QBattNormMin;
-    double QBattNormMax;    
-    double QBattNorm;
-    double QBattNormKwh;
+    float QBattNormMin;
+    float QBattNormMax;    
+    float QBattNorm;
+    float QBattNormKwh;
 
-    double ConstInCurrentOffset;
+    float ConstInCurrentOffset;
     uint16_t ConstInCurrentSampleFreq;
 } BMSSettings;
 
 typedef struct {
-    double UBattCurr          = 44.0;     // all values in Norm-Range, prevents alarms/erros on startup
+    float UBattCurr          = 44.0f;     // all values in Norm-Range, prevents alarms/erros on startup
     
-    double UCellCurrMin       = 3.6;
-    double UCellCurrAvg       = 3.6;
-    double UCellCurrMax       = 3.6;
-    double UCellCurrDelta     = 0.0;
+    float UCellCurrMin       = 3.6f;
+    float UCellCurrAvg       = 3.6f;
+    float UCellCurrMax       = 3.6f;
+    float UCellCurrDelta     = 0.0f;
 
-    double IBattCurr          = 0.0;      // Charge < 0
-    double IBattCurrCharge    = 0.0;
-    double IBattCurrDischarge = 0.0;
+    float IBattCurr          = 0.0f;      // Charge < 0
+    float IBattCurrCharge    = 0.0f;
+    float IBattCurrDischarge = 0.0f;
 
-    double TBattCurrMin       = 30.0;
-    double TBattCurrMax       = 30.0;
+    float TBattCurrMin       = 30.0f;
+    float TBattCurrMax       = 30.0f;
 
-    double QBattCurr;
-    double QBattCurrKwh;
-    double QCycleMeasuredKwh  = 0.0;
-    double QCycleStartKwh     = 0.0;
+    float QBattCurr;
+    float QBattCurrKwh;
+    float QCycleMeasuredKwh  = 0.0f;
+    float QCycleStartKwh     = 0.0f;
     
-    double IBattPlanChargeMax    = 0.1;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
-    double IBattPlanDischargeMax = 0.1;
+    float IBattPlanChargeMax    = 0.1f;   // there seems to be a check on those values, CCGX does not recognize BMS when value is zero
+    float IBattPlanDischargeMax = 0.1f;
 
-    double SohBattCurr = 1.000;
-    double SocBattCurr = 1.000;
+    float SohBattCurr = 1.000f;
+    float SocBattCurr = 1.000f;
 
     long CBmsWarnErrors = 2;   // if more then x communication errors on bms serial bus then report error
     
