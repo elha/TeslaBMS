@@ -22,7 +22,8 @@
 #define INBMBFAULT 11
 
 // Victron Bus
-#define CANVE Can0        // TX 3, RX 4
+#define CAN_DEV CAN0
+#define CAN_PIN DEF         // TX 3, RX 4
 
 // Status LED
 #define LED  13       

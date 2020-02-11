@@ -1,8 +1,12 @@
 #include <Arduino.h>
-#include <FlexCAN.h>
 
 #include "Logger.h"
 #include "config.h"
+
+#include <FlexCAN_T4.h>
+
+FlexCAN_T4<CAN_DEV, RX_SIZE_256, TX_SIZE_16> CANVE;
+
 #include "BMSModuleManager.h"
 BMSSettings settings;
 BMSStatus status;
@@ -122,7 +126,14 @@ void setup_bus()
 {
   SERIALCONSOLE.begin(115200); // USB serial
   SERIALBMS.begin(612500);     // Tesla serial bus
-  CANVE.begin(500000);         // VE.Can to CCGX
+  
+  CANVE.begin(); // VE.Can to CCGX
+  CANVE.setBaudRate(500000);
+  CANVE.setTx(CAN_PIN);
+  CANVE.setRx(CAN_PIN);
+  CANVE.enableFIFO();
+  CANVE.enableFIFOInterrupt();
+  CANVE.onReceive(loop_readcan);
 
   Logger::setLoglevel((Logger::LogLevel)settings.logLevel);
   Logger::console("Initializing ...");
@@ -540,14 +551,18 @@ void loop_vecan() // communication with Victron system over CAN
   CANVE.write(msg);
 }
 
-void loop_readcan()
+void loop_readcan(const CAN_message_t &msg)
 {
-  CAN_message_t msgin;
-  if (CANVE.available())
-  {
-    CANVE.read(msgin);
-    Logger::debug("VECan read %i %i", msgin.id, msgin.buf[0]);
+  char buf[128], *pos = buf;
+  for (int i = 0 ; i < msg.len ; i++) {
+    if (i) {
+      pos += sprintf(pos, ", ");
+    }
+    pos += sprintf(pos, "0x%.2X", msg.buf[i]);
   }
+
+  Logger::debug("VECan: MB %d OVERRUN: %d BUS %d LEN: %d EXT: %d REMOTE: %d TS: %d ID: %X IDHIT: %d Buffer: %s", 
+    msg.mb, msg.flags.overrun, msg.bus, msg.len, msg.flags.extended, msg.flags.remote, msg.timestamp, msg.id, msg.idhit, buf);
 }
 
 void loop_comerror()
