@@ -7,6 +7,10 @@
 
 FlexCAN_T4<CAN_DEV, RX_SIZE_256, TX_SIZE_16> CANVE;
 
+unsigned char bmsname[8] = {'T', 'e', 's', 'l', 'a', 'B', 'M', 'S'};
+unsigned char bmsmanu[8] = {'T', 'O', 'M', ' ', 'D', 'E', ' ', 'B'};
+unsigned char bsmFWV[2]  = {1, 0};
+
 #include "BMSModuleManager.h"
 BMSSettings settings;
 BMSStatus status;
@@ -468,7 +472,7 @@ void loop_vecan() // communication with Victron system over CAN
   // http://www.rec-bms.com/datasheet/UserManual_REC_Victron_BMS.pdf Page 10
   CAN_message_t msg;
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x351;
   msg.len = 8;
   msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10.0f));
@@ -482,7 +486,7 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x355;
   msg.len = 6;
   msg.buf[0] = (byte)(status.SocBattCurr * 100.0f);
@@ -494,7 +498,7 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x356;
   msg.len = 6;
   msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0f));
@@ -506,7 +510,7 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x35A;
   msg.len = 8;
   msg.buf[0] = (byte)((status.Error >>  0) & 0xFF); // High temp  | Low Voltage | High Voltage
@@ -520,33 +524,60 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
+  // ccgx bms detail menu
+  msg.flags.extended = 0;
+  msg.id  = 0x373;
+  msg.len = 8;
+  msg.buf[0] = lowByte(int16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[1] = highByte(int16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[2] = lowByte(int16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[3] = highByte(int16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[4] = lowByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[5] = highByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[6] = lowByte(uint16_t(bms.getHighTemperature() + 273.15));
+  msg.buf[7] = highByte(uint16_t(bms.getHighTemperature() + 273.15));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
+  // Installed capacity
+  msg.flags.extended = 0;
+  msg.id  = 0x379; 
+  msg.len = 2;
+  msg.buf[0] = lowByte(uint16_t(settings.QBattNorm));
+  msg.buf[1] = highByte(uint16_t(settings.QBattNorm));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
   // bmsname
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x35E;
   msg.len = 8;
-  msg.buf[0] = 'T';
-  msg.buf[1] = 'e';
-  msg.buf[2] = 's';
-  msg.buf[3] = 'l';
-  msg.buf[4] = 'a';
-  msg.buf[5] = 'B';
-  msg.buf[6] = 'm';
-  msg.buf[7] = 's';
+  for (size_t i = 0; i < sizeof(bmsname); i++)
+  {
+    msg.buf[i] = bmsname[i];
+  }
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
   // bmsmanufacturer
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x370;
   msg.len = 8;
-  msg.buf[0] = 'T';
-  msg.buf[1] = 'O';
-  msg.buf[2] = 'M';
-  msg.buf[3] = ' ';
-  msg.buf[4] = 'D';
-  msg.buf[5] = 'E';
-  msg.buf[6] = ' ';
-  msg.buf[7] = 'B';
+  for (size_t i = 0; i < sizeof(bmsmanu); i++)
+  {
+    msg.buf[i] = bmsmanu[i];
+  }
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
+  // bms firmware version
+  msg.flags.extended = 0;
+  msg.id = 0x35F;
+  msg.len = 4;
+  msg.buf[0] = 0x01;
+  msg.buf[1] = 0x00;
+  msg.buf[2] = lowByte(bsmFWV[0]);
+  msg.buf[3] = lowByte(bsmFWV[1]);
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 }
