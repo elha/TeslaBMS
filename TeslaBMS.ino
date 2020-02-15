@@ -488,13 +488,11 @@ void loop_vecan() // communication with Victron system over CAN
 
   msg.flags.extended = 0;
   msg.id = 0x355;
-  msg.len = 6;
+  msg.len = 4;
   msg.buf[0] = (byte)(status.SocBattCurr * 100.0f);
   msg.buf[1] = 0;
   msg.buf[2] = (byte)(status.SohBattCurr * 100.0f);
   msg.buf[3] = 0;
-  msg.buf[4] = 0; //should be 0.01% SOC but does not work for me
-  msg.buf[5] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
