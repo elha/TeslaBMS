@@ -568,14 +568,16 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  // bms firmware version
+  // bms firmware version and battery current
   msg.flags.extended = 0;
   msg.id = 0x35F;
-  msg.len = 4;
+  msg.len = 6;
   msg.buf[0] = 0x01;
   msg.buf[1] = 0x00;
   msg.buf[2] = lowByte(bsmFWV[0]);
   msg.buf[3] = lowByte(bsmFWV[1]);
+  msg.buf[4] = lowByte(uint16_t(status.QBattCurr));
+  msg.buf[5] = highByte(uint16_t(status.QBattCurr));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 }
