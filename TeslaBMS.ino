@@ -580,6 +580,19 @@ void loop_vecan() // communication with Victron system over CAN
   msg.buf[5] = highByte(uint16_t(status.QBattCurr));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
+
+  msg.id  = 0x372; // modules info
+  msg.len = 8;
+  msg.buf[0] = lowByte(uint16_t(bms.numFoundModules));                                      // System/NrOfModulesOnline
+  msg.buf[1] = highByte(uint16_t(bms.numFoundModules));
+  msg.buf[2] = lowByte(uint16_t(0));                                                        // System/NrOfModulesBlockingCharge
+  msg.buf[3] = highByte(uint16_t(0));
+  msg.buf[4] = lowByte(uint16_t(0));                                                        // System/NrOfModulesBlockingDischarge
+  msg.buf[5] = highByte(uint16_t(0));
+  msg.buf[6] = lowByte(uint16_t(settings.ConfigBattParallelStrings - bms.numFoundModules)); // System/NrOfModulesOffline
+  msg.buf[7] = highByte(uint16_t(settings.ConfigBattParallelStrings - bms.numFoundModules));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
 }
 
 void loop_readcan(const CAN_message_t &msg)
