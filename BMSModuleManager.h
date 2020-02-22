@@ -31,6 +31,7 @@ class BMSModuleManager
     float getHighCellVolt();
     float getHighVoltage();
     float getLowVoltage();
+    int numFoundModules; // The number of modules that seem to exist
     void printPackSummary();
     void printPackDetails();
     long getCommunicationErrors();
@@ -39,6 +40,5 @@ class BMSModuleManager
   private:
     BMSModule modules[MAX_MODULE_ADDR + 1]; // store data for as many modules as we've configured for.
     int batteryID;
-    int numFoundModules; // The number of modules that seem to exist
     long communicationErrors;
 };

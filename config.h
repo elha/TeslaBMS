@@ -145,6 +145,7 @@ typedef struct {
     float QBattNormKwh;
 
     float ConstInCurrentOffset;
+    float ConstInCurrentSensitivity;
     uint16_t ConstInCurrentSampleFreq;
 } BMSSettings;
 

@@ -38,8 +38,6 @@ void setup()
 
 void loop()
 {
-  loop_readcan();
-
   static unsigned long loop1;  
   if( checkinterval(loop1, 500) )
   {
@@ -121,6 +119,7 @@ void setup_settings()
   settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
   settings.ConstInCurrentOffset = 0.0f; // will be set on first measurement
+  settings.ConstInCurrentSensitivity = -375.939; // ACS758xCB 150A bidirectional, 50% = 0A, 13.3mV/A @ 5V = 13.3/5000 = 1/375.939
   settings.ConstInCurrentSampleFreq = 256;
   
   settings.logLevel = Logger::Info;
@@ -228,8 +227,7 @@ void loop_querycurrent()
   value /= (double)settings.ConstInCurrentSampleFreq;
   value -= maxvalue * 0.5;
   
-  // ACS758xCB 50A bidirectional, 50% = 0A, 40mV/A @ 5V = 40/5000 = 1/125
-  status.IBattCurr = (value / maxvalue) * 125.0l + (double)settings.ConstInCurrentOffset;
+  status.IBattCurr = (value / maxvalue) * (double)settings.ConstInCurrentSensitivity + (double)settings.ConstInCurrentOffset;
   if(settings.ConstInCurrentOffset == 0) settings.ConstInCurrentOffset = -(double)status.IBattCurr;
   
   if(status.IBattCurr >= 0)
