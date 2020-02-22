@@ -1,8 +1,16 @@
 #include <Arduino.h>
-#include <FlexCAN.h>
 
 #include "Logger.h"
 #include "config.h"
+
+#include <FlexCAN_T4.h>
+
+FlexCAN_T4<CAN_DEV, RX_SIZE_256, TX_SIZE_16> CANVE;
+
+unsigned char bmsname[8] = {'T', 'e', 's', 'l', 'a', 'B', 'M', 'S'};
+unsigned char bmsmanu[8] = {'T', 'O', 'M', ' ', 'D', 'E', ' ', 'B'};
+unsigned char bsmFWV[2]  = {1, 0};
+
 #include "BMSModuleManager.h"
 BMSSettings settings;
 BMSStatus status;
@@ -122,7 +130,14 @@ void setup_bus()
 {
   SERIALCONSOLE.begin(115200); // USB serial
   SERIALBMS.begin(612500);     // Tesla serial bus
-  CANVE.begin(500000);         // VE.Can to CCGX
+  
+  CANVE.begin(); // VE.Can to CCGX
+  CANVE.setBaudRate(500000);
+  CANVE.setTx(CAN_PIN);
+  CANVE.setRx(CAN_PIN);
+  CANVE.enableFIFO();
+  CANVE.enableFIFOInterrupt();
+  CANVE.onReceive(loop_readcan);
 
   Logger::setLoglevel((Logger::LogLevel)settings.logLevel);
   Logger::console("Initializing ...");
@@ -457,7 +472,7 @@ void loop_vecan() // communication with Victron system over CAN
   // http://www.rec-bms.com/datasheet/UserManual_REC_Victron_BMS.pdf Page 10
   CAN_message_t msg;
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x351;
   msg.len = 8;
   msg.buf[0] = lowByte(uint16_t(settings.UBattNormMax * 10.0f));
@@ -471,19 +486,17 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x355;
-  msg.len = 6;
+  msg.len = 4;
   msg.buf[0] = (byte)(status.SocBattCurr * 100.0f);
   msg.buf[1] = 0;
   msg.buf[2] = (byte)(status.SohBattCurr * 100.0f);
   msg.buf[3] = 0;
-  msg.buf[4] = 0; //should be 0.01% SOC but does not work for me
-  msg.buf[5] = 0;
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x356;
   msg.len = 6;
   msg.buf[0] = lowByte(int16_t(status.UBattCurr * 100.0f));
@@ -495,7 +508,7 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x35A;
   msg.len = 8;
   msg.buf[0] = (byte)((status.Error >>  0) & 0xFF); // High temp  | Low Voltage | High Voltage
@@ -509,45 +522,91 @@ void loop_vecan() // communication with Victron system over CAN
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
+  // ccgx bms detail menu
+  msg.flags.extended = 0;
+  msg.id  = 0x373;
+  msg.len = 8;
+  msg.buf[0] = lowByte(int16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[1] = highByte(int16_t(bms.getLowCellVolt() * 1000));
+  msg.buf[2] = lowByte(int16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[3] = highByte(int16_t(bms.getHighCellVolt() * 1000));
+  msg.buf[4] = lowByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[5] = highByte(uint16_t(bms.getLowTemperature() + 273.15));
+  msg.buf[6] = lowByte(uint16_t(bms.getHighTemperature() + 273.15));
+  msg.buf[7] = highByte(uint16_t(bms.getHighTemperature() + 273.15));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
+  // Installed capacity
+  msg.flags.extended = 0;
+  msg.id  = 0x379; 
+  msg.len = 2;
+  msg.buf[0] = lowByte(uint16_t(settings.QBattNorm));
+  msg.buf[1] = highByte(uint16_t(settings.QBattNorm));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
   // bmsname
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x35E;
   msg.len = 8;
-  msg.buf[0] = 'T';
-  msg.buf[1] = 'e';
-  msg.buf[2] = 's';
-  msg.buf[3] = 'l';
-  msg.buf[4] = 'a';
-  msg.buf[5] = 'B';
-  msg.buf[6] = 'm';
-  msg.buf[7] = 's';
+  for (size_t i = 0; i < sizeof(bmsname); i++)
+  {
+    msg.buf[i] = bmsname[i];
+  }
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 
   // bmsmanufacturer
-  msg.ext = 0;
+  msg.flags.extended = 0;
   msg.id = 0x370;
   msg.len = 8;
-  msg.buf[0] = 'T';
-  msg.buf[1] = 'O';
-  msg.buf[2] = 'M';
-  msg.buf[3] = ' ';
-  msg.buf[4] = 'D';
-  msg.buf[5] = 'E';
-  msg.buf[6] = ' ';
-  msg.buf[7] = 'B';
+  for (size_t i = 0; i < sizeof(bmsmanu); i++)
+  {
+    msg.buf[i] = bmsmanu[i];
+  }
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
+  // bms firmware version and battery current
+  msg.flags.extended = 0;
+  msg.id = 0x35F;
+  msg.len = 6;
+  msg.buf[0] = 0x01;
+  msg.buf[1] = 0x00;
+  msg.buf[2] = lowByte(bsmFWV[0]);
+  msg.buf[3] = lowByte(bsmFWV[1]);
+  msg.buf[4] = lowByte(uint16_t(status.QBattCurr));
+  msg.buf[5] = highByte(uint16_t(status.QBattCurr));
+  Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
+  CANVE.write(msg);
+
+  msg.id  = 0x372; // modules info
+  msg.len = 8;
+  msg.buf[0] = lowByte(uint16_t(bms.numFoundModules));                                      // System/NrOfModulesOnline
+  msg.buf[1] = highByte(uint16_t(bms.numFoundModules));
+  msg.buf[2] = lowByte(uint16_t(0));                                                        // System/NrOfModulesBlockingCharge
+  msg.buf[3] = highByte(uint16_t(0));
+  msg.buf[4] = lowByte(uint16_t(0));                                                        // System/NrOfModulesBlockingDischarge
+  msg.buf[5] = highByte(uint16_t(0));
+  msg.buf[6] = lowByte(uint16_t(settings.ConfigBattParallelStrings - bms.numFoundModules)); // System/NrOfModulesOffline
+  msg.buf[7] = highByte(uint16_t(settings.ConfigBattParallelStrings - bms.numFoundModules));
   Logger::debug("VECan %i %i", msg.id, msg.buf[0]);
   CANVE.write(msg);
 }
 
-void loop_readcan()
+void loop_readcan(const CAN_message_t &msg)
 {
-  CAN_message_t msgin;
-  if (CANVE.available())
-  {
-    CANVE.read(msgin);
-    Logger::debug("VECan read %i %i", msgin.id, msgin.buf[0]);
+  char buf[128], *pos = buf;
+  for (int i = 0 ; i < msg.len ; i++) {
+    if (i) {
+      pos += sprintf(pos, ", ");
+    }
+    pos += sprintf(pos, "0x%.2X", msg.buf[i]);
   }
+
+  Logger::debug("VECan: MB %d OVERRUN: %d BUS %d LEN: %d EXT: %d REMOTE: %d TS: %d ID: %X IDHIT: %d Buffer: %s", 
+    msg.mb, msg.flags.overrun, msg.bus, msg.len, msg.flags.extended, msg.flags.remote, msg.timestamp, msg.id, msg.idhit, buf);
 }
 
 void loop_comerror()
