@@ -1,6 +1,7 @@
 # TeslaBMS
 
-Based off work done by Collin Kidder and Tom de Bree.
+Based off work done by Collin Kidder and Tom de Bree. 
+Improved by Andreas Schubert.
 
 
 # Homestorage
