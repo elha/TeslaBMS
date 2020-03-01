@@ -87,9 +87,9 @@ void setup_settings()
   settings.ConfigBattSerialCells     = 12;
   settings.ConfigBattParallelStrings =  2;
   
-  settings.UCellWarnMin = 3.10f;
-  settings.UCellNormMin = 3.25f;
-  settings.UCellOptiMin = 3.30f;
+  settings.UCellWarnMin = 3.30f;
+  settings.UCellNormMin = 3.38f;
+  settings.UCellOptiMin = 3.40f;
 
   settings.UCellOptiMax = 4.00f;
   settings.UCellNormMax = 4.06f;
@@ -105,7 +105,7 @@ void setup_settings()
   settings.IBattOptiChargeMax    = 40.0f;
   settings.IBattWarnChargeMax    = 80.0f;
   
-  settings.IBattOptiDischargeMax = 70.0f;
+  settings.IBattOptiDischargeMax = 30.0f;
   settings.IBattWarnDischargeMax = 90.0f;
   
   settings.TBattNormMin = 15.0f;
@@ -119,7 +119,7 @@ void setup_settings()
   settings.QBattNormKwh = getQBattNorm(settings.UCellNormMax);
 
   settings.ConstInCurrentOffset = 0.0f; // will be set on first measurement
-  settings.ConstInCurrentSensitivity = -375.939; // ACS758xCB 150A bidirectional, 50% = 0A, 13.3mV/A @ 5V = 13.3/5000 = 1/375.939
+  settings.ConstInCurrentSensitivity = -375.939f; // ACS758xCB 150A bidirectional, 50% = 0A, 13.3mV/A @ 5V = 13.3/5000 = 1/375.939
   settings.ConstInCurrentSampleFreq = 256;
   
   settings.logLevel = Logger::Info;
@@ -440,20 +440,26 @@ void loop_calc()
   // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
   status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
   status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
-
+  status.QCycleNormKwh = status.QCycleStartKwh - status.QBattCurrKwh; 
+  
   status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
   if(status.SocBattCurr < 0.0f) status.SocBattCurr = 0.0f;
   if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
   
-  // SohBattCurr = QBattCurr / QBattNorm
-  if(abs(status.QCycleMeasuredKwh)>0.2f && abs(status.QCycleStartKwh - status.QBattCurrKwh)>0.2f)
-    status.SohBattCurr = abs(status.QCycleMeasuredKwh) / abs(status.QCycleStartKwh - status.QBattCurrKwh);  
+  // SohBattCurr = QBattCurr / QBattNorm (Discharge) or QBattNorm / QBattCurr (Charge)
+  if(status.QCycleMeasuredKwh > +0.002f && status.QCycleNormKwh > +0.002f) 
+    status.SohBattCurr = (double)status.QCycleMeasuredKwh / (double)status.QCycleNormKwh;  // discharge
+  if(status.QCycleMeasuredKwh < -0.002f && status.QCycleNormKwh < -0.002f) 
+    status.SohBattCurr = (double)status.QCycleNormKwh / (double)status.QCycleMeasuredKwh;  // charge
+
+  if(status.SohBattCurr > 1.0f) status.SohBattCurr = 1.0f;
 }
 
 void loop_console()
 {
-  Logger::info("Qm=%fkWh Q=%fAh/%fAh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV UCellDelta=%fV T=%fC", 
+  Logger::info("Qm=%f/%fkWh Q=%fAh/%fAh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV UCellDelta=%fV T=%fC", 
                         status.QCycleMeasuredKwh,
+                        status.QCycleNormKwh,
                         status.QBattCurr, settings.QBattNorm,
                         status.QBattCurrKwh, settings.QBattNormKwh, 
                         status.SocBattCurr * 100.0f, status.SohBattCurr * 100.0f,
@@ -662,4 +668,10 @@ byte checkinterval(unsigned long &loop_PreviousMillis, unsigned long loop_Interv
   {
     return 0;
   }
+}
+
+static inline int8_t sgn(float val) {
+  if (val < 0) return -1;
+  if (val==0) return 0;
+  return 1;
 }
