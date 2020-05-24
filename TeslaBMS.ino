@@ -102,10 +102,10 @@ void setup_settings()
   settings.UCellWarnBalanceDiff = 0.06f;
 
   settings.IBattOptiChargeMin    = 05.0f;
-  settings.IBattOptiChargeMax    = 40.0f;
-  settings.IBattWarnChargeMax    = 80.0f;
+  settings.IBattOptiChargeMax    = 50.0f;
+  settings.IBattWarnChargeMax    = 90.0f;
   
-  settings.IBattOptiDischargeMax = 30.0f;
+  settings.IBattOptiDischargeMax = 90.0f;
   settings.IBattWarnDischargeMax = 90.0f;
   
   settings.TBattNormMin = 15.0f;
@@ -241,7 +241,7 @@ void loop_querycurrent()
     status.IBattCurrDischarge = 0.0f;
   }
 
-  status.QCycleMeasuredKwh += status.IBattCurr / (double)3600.0 /(double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
+  status.QCycleMeasuredKwh += (double)status.IBattCurr / (double)3600.0 / (double)1000.0 * (double)status.UCellCurrAvg * (double)settings.ConfigBattSerialCells;
 }
 
 void loop_querybatt()
@@ -419,14 +419,14 @@ void loop_contactor()
   else if ((status.State == 4 || status.State == 5) && status.IBattCurr > 0.0f)  // charging -> discharging
   {    
     status.State = 6;
-    status.QCycleStartKwh = status.QBattCurrKwh;
+    status.QCycleNormStartKwh = status.QBattCurrKwh;
     status.QCycleMeasuredKwh = 0.0f;
     Logger::info("Contactor - closed, started discharging");  
   }
   else if ((status.State == 4 || status.State == 6) && status.IBattCurr < 0.0f)  // discharging -> charging
   {    
     status.State = 5;
-    status.QCycleStartKwh = status.QBattCurrKwh;
+    status.QCycleNormStartKwh = status.QBattCurrKwh;
     status.QCycleMeasuredKwh = 0.0f;
     Logger::info("Contactor - closed, started charging");  
   }
@@ -440,17 +440,17 @@ void loop_calc()
   // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
   status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
   status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
-  status.QCycleNormKwh = status.QCycleStartKwh - status.QBattCurrKwh; 
   
   status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
   if(status.SocBattCurr < 0.0f) status.SocBattCurr = 0.0f;
   if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
   
   // SohBattCurr = QBattCurr / QBattNorm (Discharge) or QBattNorm / QBattCurr (Charge)
-  if(status.QCycleMeasuredKwh > +0.002f && status.QCycleNormKwh > +0.002f) 
+  status.QCycleNormKwh = status.QCycleNormStartKwh - status.QBattCurrKwh; 
+  if(status.QCycleMeasuredKwh > +1.0f && status.QCycleNormKwh > +1.0f) 
     status.SohBattCurr = (double)status.QCycleMeasuredKwh / (double)status.QCycleNormKwh;  // discharge
-  if(status.QCycleMeasuredKwh < -0.002f && status.QCycleNormKwh < -0.002f) 
-    status.SohBattCurr = (double)status.QCycleNormKwh / (double)status.QCycleMeasuredKwh;  // charge
+  if(status.QCycleMeasuredKwh < -1.0f && status.QCycleNormKwh < -1.0f) 
+    status.SohBattCurr = (double)status.QCycleMeasuredKwh / (double)status.QCycleNormKwh;  // charge
 
   if(status.SohBattCurr > 1.0f) status.SohBattCurr = 1.0f;
 }
