@@ -166,9 +166,9 @@ void setup_adc()
 {
   pinMode(INCURRENT, INPUT);
   
-  adc.setResolution(14);
-  adc.setConversionSpeed(ADC_CONVERSION_SPEED::LOW_SPEED);
-  adc.setSamplingSpeed(ADC_SAMPLING_SPEED::LOW_SPEED);
+  adc.adc0->setResolution(14);
+  adc.adc0->setConversionSpeed(ADC_CONVERSION_SPEED::LOW_SPEED);
+  adc.adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::LOW_SPEED);
   adc.adc0->analogRead(INCURRENT); // performs various ADC setup stuff
 
   dma.source(ADC0_RA); // ADC result register
@@ -177,7 +177,7 @@ void setup_adc()
   dma.destinationBuffer(buffer.data(), buffer.size() * sizeof(buffer[0]));
   dma.enable();
 
-  adc.enableDMA(ADC_0);
+  adc.adc0->enableDMA();
   
   adc.adc0->stopPDB();
   adc.adc0->startPDB(settings.ConstInCurrentSampleFreq); 
@@ -335,8 +335,9 @@ void loop_bms()
     
   if (status.TBattCurrMin < settings.TBattNormMin)
   {
-    status.Error |= ERROR_LOWPACKTEMP;
-    Logger::error("Error - low battery temp %f under %f", status.TBattCurrMin, settings.TBattNormMin);
+    status.IBattPlanDischargeMax *= 0.2;
+    status.IBattPlanChargeMax *= 0.2;
+    Logger::info("Undertemp, limiting Current", status.TBattCurrMin, settings.TBattNormMin);
   }
 
   if (status.IBattCurrDischarge > settings.IBattWarnDischargeMax)
