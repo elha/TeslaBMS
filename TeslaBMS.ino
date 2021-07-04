@@ -69,8 +69,15 @@ void loop()
     loop_console();
   }
 
-  static unsigned long loop3;  
-  if( checkinterval(loop3, 3600000) )
+  static unsigned long loop3;
+  if (checkinterval(loop3, 120000) )
+  {
+    // rebalance
+    loop_rebalance();
+  }
+
+  static unsigned long loop4;  
+  if( checkinterval(loop4, 3600000) )
   {
     // clear com errors
     loop_comerror();
@@ -85,7 +92,7 @@ void setup_settings()
 
   settings.ConfigBattParallelCells   = 74;
   settings.ConfigBattSerialCells     = 12;
-  settings.ConfigBattParallelStrings =  2;
+  settings.ConfigBattParallelStrings =  4;
   
   settings.UCellWarnMin = 3.30f;
   settings.UCellNormMin = 3.38f;
@@ -99,10 +106,10 @@ void setup_settings()
   settings.UBattNormMax = settings.UCellNormMax * (float)settings.ConfigBattSerialCells;
 
   settings.UCellNormBalanceDiff = 0.03f;
-  settings.UCellWarnBalanceDiff = 0.06f;
+  settings.UCellWarnBalanceDiff = 0.10f;
 
   settings.IBattOptiChargeMin    = 05.0f;
-  settings.IBattOptiChargeMax    = 50.0f;
+  settings.IBattOptiChargeMax    = 90.0f;
   settings.IBattWarnChargeMax    = 90.0f;
   
   settings.IBattOptiDischargeMax = 90.0f;
@@ -229,6 +236,7 @@ void loop_querycurrent()
   
   status.IBattCurr = (value / maxvalue) * (double)settings.ConstInCurrentSensitivity + (double)settings.ConstInCurrentOffset;
   if(settings.ConstInCurrentOffset == 0) settings.ConstInCurrentOffset = -(double)status.IBattCurr;
+  status.ICellCurr = (double)status.IBattCurr / (double)settings.ConfigBattParallelCells  / (double)settings.ConfigBattParallelStrings;
   
   if(status.IBattCurr >= 0)
   {
@@ -248,14 +256,29 @@ void loop_querybatt()
 {
   bms.getAllVoltTemp();
   status.UBattCurr = (double)bms.getPackVoltage() / (double)settings.ConfigBattParallelStrings;
+  status.UCellCurr = (double)status.UBattCurr / (double)settings.ConfigBattSerialCells;
   
   status.UCellCurrMin = bms.getLowCellVolt();
   status.UCellCurrAvg = bms.getAvgCellVolt();
+  status.UCellCurrAdj = (double)status.UCellCurrAvg + (double)status.RCellCurr * (double)status.ICellCurr;
   status.UCellCurrMax = bms.getHighCellVolt();
   status.UCellCurrDelta = status.UCellCurrMax - status.UCellCurrMin;
   
   status.TBattCurrMin = bms.getLowTemperature();
   status.TBattCurrMax = bms.getHighTemperature(); 
+}
+
+void loop_rebalance()
+{   
+  if (status.UCellCurrDelta > settings.UCellNormBalanceDiff && 
+      status.IBattCurrCharge > 3 && 
+      status.SocBattCurr > 0.28 && status.SocBattCurr < 0.73 && 
+      bms.balanceCells(status.UCellCurrAvg, settings.UCellNormBalanceDiff / 2.0f)) {
+    Logger::info("Balancing Pack");
+    status.IsBalancing = true;
+  }
+  else
+    status.IsBalancing = false;
 }
 
 void loop_bms()
@@ -268,37 +291,26 @@ void loop_bms()
 
   status.Alarm = ERROR_NONE;
   status.Error = ERROR_NONE;
-
+  
   if (status.UCellCurrMax < settings.UCellOptiMax)
   {
     status.IBattPlanChargeMax = settings.IBattOptiChargeMax;
   }
   else if (status.UCellCurrMax < settings.UCellNormMax)
   {
-    if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
-      if (bms.balanceCells(settings.UCellNormBalanceDiff)) {
-        Logger::info("Balancing Pack");
-        status.Alarm |= ERROR_CELLIMBALANCE; // not a real alarm, but wanted to be notified in CCGX
-      }
-
     status.IBattPlanChargeMax = settings.IBattOptiChargeMax * (settings.UCellNormMax - status.UCellCurrMax) / (settings.UCellNormMax - settings.UCellOptiMax);   
     if (status.IBattPlanChargeMax < settings.IBattOptiChargeMin) status.IBattPlanChargeMax = settings.IBattOptiChargeMin; // minimum charge
   }
   else if (status.UCellCurrMax < settings.UCellWarnMax)
   {
-    if (status.IBattCurrCharge > 0.1 * settings.IBattOptiChargeMax)
-      if (bms.balanceCells(settings.UCellNormBalanceDiff)) {
-        Logger::info("Balancing Pack");
-        status.Alarm |= ERROR_CELLIMBALANCE; // not a real alarm, but wanted to be notified in CCGX
-      }
-
     status.IBattPlanChargeMax = 0;
     // status.Alarm |= ERROR_HIGHCELLVOLTAGE; // do not fire alarm, happens often
   }
   else //if (status.UCellCurrMax < settings.UCellErrorMax) or worse
   {
     status.IBattPlanChargeMax = 0;
-    status.Error |= ERROR_HIGHCELLVOLTAGE;
+    if (!status.IsBalancing)
+      status.Error |= ERROR_HIGHCELLVOLTAGE;
   }
 
   if (status.UCellCurrMin > settings.UCellOptiMin)
@@ -317,9 +329,15 @@ void loop_bms()
   else //if (status.UCellCurrMin > settings.UCellErrorMin) or worse
   {
     status.IBattPlanDischargeMax = 0;
-    status.Error |= ERROR_LOWCELLVOLTAGE;
+ //   status.Error |= ERROR_LOWCELLVOLTAGE;
   }
-
+  
+  // reduce Charging-Power by 50% if balancing
+  if (status.IsBalancing)
+  {
+    status.IBattPlanChargeMax *= 0.5;
+  }
+  
   // check errors could implement warnings
   if (status.TBattCurrMax > settings.TBattWarnMax)
   {
@@ -335,8 +353,8 @@ void loop_bms()
     
   if (status.TBattCurrMin < settings.TBattNormMin)
   {
-    status.IBattPlanDischargeMax *= 0.2;
-    status.IBattPlanChargeMax *= 0.2;
+    status.IBattPlanDischargeMax *= 0.3;
+    status.IBattPlanChargeMax *= 0.3;
     Logger::info("Undertemp, limiting Current", status.TBattCurrMin, settings.TBattNormMin);
   }
 
@@ -358,7 +376,7 @@ void loop_bms()
     Logger::error("Error - internal failure");
   }
 
-  if (status.UCellCurrDelta > settings.UCellWarnBalanceDiff)
+  if (!status.IsBalancing && status.UCellCurrDelta > settings.UCellWarnBalanceDiff)
   {
     status.Error |= ERROR_CELLIMBALANCE;
     Logger::error("Error - cell imbalance");
@@ -370,8 +388,8 @@ void loop_bms()
     Logger::error("Error - bms communication errors");    
   }
 
-  // shut off charging/discharging on Warning or Error
-  if (status.Error != 0 || status.Alarm != 0)
+  // shut off charging/discharging on Error
+  if (status.Error != 0)
   {
     status.IBattPlanChargeMax = 0;
     status.IBattPlanDischargeMax = 0;
@@ -405,7 +423,7 @@ void loop_contactor()
     status.State = 2;
     Logger::info("Contactor - preload");  
   }
-  else if (status.State == 2 && abs(status.IBattCurr) < 0.30)  // close Contactor when current is minimal
+  else if (status.State == 2 && fabs(status.IBattCurr) < 0.30)  // close Contactor when current is minimal
   {    
     digitalWrite(CONTACTOR, HIGH);
     status.State = 3;
@@ -438,35 +456,61 @@ void loop_calc()
 {
   // QBattNorm           = 100% Capacity within Norm-range [Ah]
   // QBattCurr           = current Capacity [Ah]
-  // OCV Method: Mapping UCellCurrAvg to discharge curve: 0%-100% = Norm-Range not Spec-Range
-  status.QBattCurr = getQCellSpec(status.UCellCurrAvg) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
-  status.QBattCurrKwh = getQBattNorm(status.UCellCurrAvg);
+  // OCV Method: Mapping UCellCurrAdj to discharge curve: 0%-100% = Norm-Range not Spec-Range
+  status.QBattCurr = getQCellSpec(status.UCellCurrAdj) * (float)settings.ConfigBattParallelCells * (float)settings.ConfigBattParallelStrings - settings.QBattNormMin;  
+  status.QBattCurrKwh = getQBattNorm(status.UCellCurrAdj);
   
-  status.SocBattCurr = status.QBattCurrKwh / settings.QBattNormKwh;
+  status.SocBattCurr = (double)status.QBattCurrKwh / (double)settings.QBattNormKwh;
   if(status.SocBattCurr < 0.0f) status.SocBattCurr = 0.0f;
   if(status.SocBattCurr > 1.0f) status.SocBattCurr = 1.0f;
   
   // SohBattCurr = QBattCurr / QBattNorm (Discharge) or QBattNorm / QBattCurr (Charge)
-  status.QCycleNormKwh = status.QCycleNormStartKwh - status.QBattCurrKwh; 
+  status.QCycleNormKwh = (double)status.QCycleNormStartKwh - (double)status.QBattCurrKwh; 
   if(status.QCycleMeasuredKwh > +1.0f && status.QCycleNormKwh > +1.0f) 
     status.SohBattCurr = (double)status.QCycleMeasuredKwh / (double)status.QCycleNormKwh;  // discharge
   if(status.QCycleMeasuredKwh < -1.0f && status.QCycleNormKwh < -1.0f) 
     status.SohBattCurr = (double)status.QCycleMeasuredKwh / (double)status.QCycleNormKwh;  // charge
 
   if(status.SohBattCurr > 1.0f) status.SohBattCurr = 1.0f;
+
+  // calc cell internal resistance, queue values
+  status.UCellCurrHistory[2] = status.UCellCurrHistory[1]; 
+  status.UCellCurrHistory[1] = status.UCellCurrHistory[0];
+  status.UCellCurrHistory[0] = status.UCellCurr; 
+
+  status.ICellCurrHistory[2] = status.ICellCurrHistory[1]; 
+  status.ICellCurrHistory[1] = status.ICellCurrHistory[0];
+  status.ICellCurrHistory[0] = status.ICellCurr; 
+
+  double dICell   = ((double)status.ICellCurrHistory[0] - (double)status.ICellCurrHistory[2]); //rise in discharge positive 20A - 2A = 18A
+  double dUCell = ((double)status.UCellCurrHistory[0] - (double)status.UCellCurrHistory[2]) * (double)-1; //rise in discharge negative 3.4V - 3.6V = -0.2A  -> negate
+
+  if(!status.IsBalancing && fabs(dICell) > 0.02 && dUCell != 0)
+  {
+    double r = (double)dUCell / (double)dICell;
+    if(status.RCellCurr>0) 
+    {
+      r += (double)status.RCellCurr * (double)19;
+      r /= (double)20; // simple average 20 samples
+    }
+     
+    status.RCellCurr = r;
+  }
 }
 
 void loop_console()
 {
-  Logger::info("Qm=%f/%fkWh Q=%fAh/%fAh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV UCellDelta=%fV T=%fC", 
-                        status.QCycleMeasuredKwh,
-                        status.QCycleNormKwh,
-                        status.QBattCurr, settings.QBattNorm,
+  Logger::info("Qm=%f/%fkWh Q=%fkWh/%fkWh SOC=%f SOH=%f I=%fA UBatt=%fV UCell=%fV/%fV(adj) UCellDelta=%fV RCell=%fmO T=%fC", 
+                        status.QCycleMeasuredKwh, status.QCycleNormKwh,
                         status.QBattCurrKwh, settings.QBattNormKwh, 
                         status.SocBattCurr * 100.0f, status.SohBattCurr * 100.0f,
-                        status.IBattCurr, status.UBattCurr, status.UCellCurrAvg, status.UCellCurrDelta,
+                        status.IBattCurr, status.UBattCurr, 
+                        status.UCellCurrAvg, status.UCellCurrAdj, status.UCellCurrDelta,
+                        status.RCellCurr * 1000.0f,
                         status.TBattCurrMax );
 
+  bms.balanceInfo();
+  
   if (settings.logLevel > Logger::Debug) return;
 
   bms.printPackDetails();

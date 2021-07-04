@@ -152,60 +152,57 @@ bool BMSModule::readModuleValues()
 }
 
 // balancing only needed if CellVoltageDiff is highter than supplied value
-bool BMSModule::needsBalancing(float minDiffV)
+bool BMSModule::needsBalancing(float avgCellV)
 {
-    return getHighCellV() - getLowCellV() >= minDiffV ; 
+    balancing = false;
+    return getHighCellV() >= avgCellV ; 
 }
 
-void BMSModule::balanceCells()
+void BMSModule::balanceCells(float avgCellV)
 {
-    uint8_t balance = 0; //bit 0 - 5 are to activate cell balancing 1-6
+    float   highCellV = getHighCellV();    
+    float   lowCellV = getLowCellV();    
 
+    int     maxcells = 4; // do not balance more then x cells per module
+    uint8_t balancemap =  0;
     for (int i = 0; i < 6; i++)
-    {
-        if (getLowCellV() < getCellVoltage(i))
-        {
-            balance = balance | (1 << i); //set bit on cells with higher voltage than lowest cell
-        }
-    }
+        if (cellVolt[i] >= avgCellV && maxcells-- > 0) 
+          balancemap |= (1 << i); // all cells over 50% of min-diff
 
-    if (balance != 0) //only send balance command when needed
-    {
-        uint8_t payload[4];
-        uint8_t buff[30];
+    if(maxcells == 4) return; // none found
+
+    Logger::info("Balancing module %i  (%b)  min %fV max %fV, target %fV",   moduleAddress, balancemap, lowCellV, highCellV, avgCellV);
+
+    uint8_t payload[4];
+    uint8_t buff[30];
+
+    payload[0] = moduleAddress << 1;
+    payload[1] = REG_BAL_CTRL;
+    payload[2] = 0; //writing zero to this register resets balance time and must be done before setting balance resistors again.
+    BMSUtil::sendData(payload, 3, true);
+    delay(2);
+    BMSUtil::getReply(buff, 30);
     
-        payload[0] = moduleAddress << 1;
-        payload[1] = REG_BAL_TIME;
-        payload[2] = 0x05; //5 second balance limit, if not triggered to balance it will stop after 5 seconds
-        BMSUtil::sendData(payload, 3, true);
-        delay(2);
-        BMSUtil::getReply(buff, 30);
+    payload[0] = moduleAddress << 1;
+    payload[1] = REG_BAL_TIME;
+    payload[2] = 40; // 40 second balance limit, if not triggered to balance it will stop after 
+    BMSUtil::sendData(payload, 3, true);
+    delay(2);
+    BMSUtil::getReply(buff, 30);
 
-        payload[0] = moduleAddress << 1;
-        payload[1] = REG_BAL_CTRL;
-        payload[2] = balance; //write balance state to register
-        BMSUtil::sendData(payload, 3, true);
-        delay(2);
-        BMSUtil::getReply(buff, 30);
+    payload[0] = moduleAddress << 1;
+    payload[1] = REG_BAL_CTRL;
+    payload[2] = balancemap; //write balance state to register
+    BMSUtil::sendData(payload, 3, true);
+    delay(2);
+    BMSUtil::getReply(buff, 30);
 
-        if (Logger::isDebug()) //read registers back out to check if everything is good
-        {
-            delay(50);
-            payload[0] = moduleAddress << 1;
-            payload[1] = REG_BAL_TIME;
-            payload[2] = 1; //
-            BMSUtil::sendData(payload, 3, false);
-            delay(2);
-            BMSUtil::getReply(buff, 30);
+    balancing = true;
+}
 
-            payload[0] = moduleAddress << 1;
-            payload[1] = REG_BAL_CTRL;
-            payload[2] = 1; //
-            BMSUtil::sendData(payload, 3, false);
-            delay(2);
-            BMSUtil::getReply(buff, 30);
-        }
-    }
+void BMSModule::print()
+{
+      Logger::info("Module %i  %fV, %fV, %fV, %fV, %fV, %fV",  moduleAddress, cellVolt[0], cellVolt[1], cellVolt[2], cellVolt[3], cellVolt[4], cellVolt[5]);
 }
 
 float BMSModule::getCellVoltage(int cell)
@@ -284,6 +281,11 @@ int BMSModule::getAddress()
 bool BMSModule::isExisting()
 {
     return exists;
+}
+
+bool BMSModule::isBalancing()
+{
+    return balancing;
 }
 
 void BMSModule::setExists(bool ex)

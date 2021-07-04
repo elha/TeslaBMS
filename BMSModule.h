@@ -5,9 +5,10 @@ class BMSModule
   public:
     BMSModule();
     void readStatus();
+    void print();
     bool readModuleValues();
-    bool needsBalancing(float minDiffV);
-    void balanceCells();
+    bool needsBalancing(float avgCellV);
+    void balanceCells(float avgCellV);
     float getCellVoltage(int cell);
     float getLowCellV();
     float getHighCellV();
@@ -24,6 +25,7 @@ class BMSModule
     void setAddress(int newAddr);
     int getAddress();
     bool isExisting();
+    bool isBalancing();
     void setExists(bool ex);
 
   private:
@@ -31,6 +33,7 @@ class BMSModule
     float moduleVolt;      // calculated as 16 bit value * 33.333 / 16383 = volts
     float temperatures[2]; // Don't know the proper scaling at this point
     bool exists;
+    bool balancing;
     int alerts;
     int faults;
     int COVFaults;

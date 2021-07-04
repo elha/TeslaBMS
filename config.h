@@ -151,16 +151,24 @@ typedef struct {
 
 typedef struct {
     float UBattCurr          = 44.0f;     // all values in Norm-Range, prevents alarms/erros on startup
+    float UCellCurr          = 3.6f;      // 1/6th Packvoltage
+    float UCellCurrHistory[3];  
     
-    float UCellCurrMin       = 3.6f;
+    float UCellCurrMin       = 3.6f;      // from BMS
     float UCellCurrAvg       = 3.6f;
     float UCellCurrMax       = 3.6f;
     float UCellCurrDelta     = 0.0f;
 
+    float UCellCurrAdj       = 3.6f;      // adjusted by IR
+
     float IBattCurr          = 0.0f;      // Charge < 0
     float IBattCurrCharge    = 0.0f;
     float IBattCurrDischarge = 0.0f;
+    float ICellCurr          = 0.0f;
+    float ICellCurrHistory[3];
 
+    float RCellCurr          = 0.0f;      // IR 
+    
     float TBattCurrMin       = 30.0f;
     float TBattCurrMax       = 30.0f;
 
@@ -177,6 +185,7 @@ typedef struct {
     float SocBattCurr = 1.000f;
 
     long CBmsWarnErrors = 2;   // if more then x communication errors on bms serial bus then report error
+    bool IsBalancing = false;
     
     byte State = 0; // 0 disconnect, 1 preload, 2 connect, 3 release preload, 4 charge, 5 discharge
 

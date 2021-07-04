@@ -6,10 +6,11 @@ class BMSModuleManager
 {
   public:
     BMSModuleManager();
-    bool balanceCells(float minDiffV);
+    bool balanceCells(float avgCellV, float triggerDiffCellV);
     void setupBoards();
     void findBoards();
     void renumberBoardIDs();
+    void balanceInfo();
     bool isFaulted;  
     void clearFaults();
     void sleepBoards();

@@ -13,20 +13,31 @@ BMSModuleManager::BMSModuleManager()
     isFaulted = false;
 }
 
-bool BMSModuleManager::balanceCells(float minDiffV)
+bool BMSModuleManager::balanceCells(float avgCellV, float triggerDiffCellV)
 {
     bool out = false;
-    for (int x = 1; x <= MAX_MODULE_ADDR; x++)
+    for (int x = 1; x <= MAX_MODULE_ADDR; x+=2)
     {
-        if (modules[x].isExisting() && modules[x].needsBalancing(minDiffV))
+        if (modules[x].isExisting() && modules[x+1].isExisting() && (modules[x].needsBalancing(avgCellV + triggerDiffCellV) || modules[x+1].needsBalancing(avgCellV + triggerDiffCellV)))
             {
                 out = true;
-                modules[x].balanceCells();
+                modules[x].balanceCells(avgCellV);
+                modules[x+1].balanceCells(avgCellV);
             }
     }
     return out;
 }
 
+void BMSModuleManager::balanceInfo()
+{
+    for (int x = 1; x <= MAX_MODULE_ADDR; x++)
+    {
+        if (modules[x].isExisting() && modules[x].isBalancing())
+            {
+                modules[x].print();
+            }
+    }
+}
 /*
  * Try to set up any unitialized boards. Send a command to address 0 and see if there is a response. If there is then there is
  * still at least one unitialized board. Go ahead and give it the first ID not registered as already taken.
@@ -38,6 +49,7 @@ bool BMSModuleManager::balanceCells(float minDiffV)
  */
 void BMSModuleManager::setupBoards()
 {
+    Logger::debug("setupBoards starting");
     uint8_t payload[3];
     uint8_t buff[10];
     int retLen;
@@ -60,6 +72,7 @@ void BMSModuleManager::setupBoards()
                 //look for a free address to use
                 for (int y = 1; y < 63; y++)
                 {
+                    Logger::debug("Addresstest %X", y);
                     if (!modules[y].isExisting())
                     {
                         payload[0] = 0;
@@ -69,11 +82,16 @@ void BMSModuleManager::setupBoards()
                         delay(3);
                         if (BMSUtil::getReply(buff, 10) > 2)
                         {
+                            Logger::debug("got reply %X", y);
                             if (buff[0] == (0x81) && buff[1] == REG_ADDR_CTRL && buff[2] == (y + 0x80))
                             {
                                 modules[y].setExists(true);
                                 numFoundModules++;
-                                Logger::debug("Address assigned");
+                                Logger::debug("Address assigned %X", y);
+                            }
+                            else
+                            {
+                                Logger::debug("Address no response %X", y);
                             }
                         }
                         break; //quit the for loop
@@ -81,10 +99,16 @@ void BMSModuleManager::setupBoards()
                 }
             }
             else
-                break; //nobody responded properly to the zero address so our work here is done.
+            {
+              Logger::debug("no response from bms 1");
+              break; //nobody responded properly to the zero address so our work here is done.
+            }
         }
         else
-            break;
+        {
+            Logger::debug("no response from bms 2");
+            break; //nobody responded properly to the zero address so our work here is done.
+        }    
     }
 }
 
@@ -125,6 +149,7 @@ void BMSModuleManager::findBoards()
 */
 void BMSModuleManager::renumberBoardIDs()
 {
+    Logger::debug("renumberBoardIDs starting");
     pinMode(INBMBFAULT, INPUT);
 
     uint8_t payload[3];
